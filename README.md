@@ -6,7 +6,6 @@
 
 ## Contents
 
-- [Architecture](#architecture)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Build and run](#build-and-run)
@@ -19,26 +18,6 @@
 - [Privacy](#safety-and-privacy)
 - [License](#license)
 
-
-## Architecture
-
-```text
-Developer application (C)
-            |
-            v
-      AheadForm SDK
-       /         \
-      v           v
- CycloneDDS    GStreamer
- Controls &    Audio / Video
- Status        Streams
-      \           /
-       v         v
-       AheadForm Robot
-```
-
-- **AheadRuntime:** motion/audio execution and synchronized playback.
-- **AheadSense:** multimodal subscriptions and local recordings.
 
 ## Requirements
 
