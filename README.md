@@ -1,249 +1,175 @@
-# AheadFormSDK V1.0
+# AheadFormSDK 快速上手
+## CSV 剧本播放
+> 接口预览版，随交付版本更新。以下播放接口按目标交付形态约定，具体声明以交付版头文件为准。
 
-**A C SDK for developers on AheadForm robots.**
+使用者在客户端本地加载 CSV，驱动机器人表情、头部和双眼姿态。
 
-> **Release status:** AheadFormSDK V1.0 provides programmatic access to robot motion control, scripted performances, audio/video streaming, and device status. It uses **Eclipse CycloneDDS** for control and state messages, and **GStreamer 1.0** for audio/video transport.
+## 1. 准备配置和文件
 
-## Contents
+将 CSV 保留在客户端可访问的目录，在运行目录准备 `aheadform.ini`：
 
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Build and run](#build-and-run)
-- [Quick start](#quick-start)
-- [Configuration](#configuration)
-- [API overview](#api-overview)
-- [Examples](#examples)
-- [Data formats and constraints](#data-formats-and-constraints)
-- [Error handling and troubleshooting](#error-handling-and-troubleshooting)
-- [Privacy](#safety-and-privacy)
-- [License](#license)
-
-
-## Requirements
-
-| Dependency | Requirement |
-| --- | --- |
-| OS | Ubuntu / Debian Linux |
-| Toolchain | GCC with `-std=gnu11`, GNU Make, CMake, Git |
-| Build metadata | `pkg-config` |
-| DDS | Eclipse CycloneDDS **11.0.1**, static `libddsc.a` |
-| Media | GStreamer 1.0 development libraries and runtime plugins |
-
-Default CycloneDDS install prefix: `/opt/cyclonedds-11.0.1-static`.
-
-> Even control-only examples include GStreamer headers (`<gst/gst.h>`) and therefore require its development packages.
-
-## Installation
-
-### 1. Install system dependencies
-
-```bash
-sudo apt update
-sudo apt install -y build-essential cmake git pkg-config \
-  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-  gstreamer1.0-tools gstreamer1.0-plugins-base \
-  gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
-  gstreamer1.0-plugins-ugly gstreamer1.0-libav
+```ini
+[dds]
+interface = wlan0
+domain_id = 11
 ```
 
-> Some media plugins and codecs may have additional redistribution or patent considerations. Check the final distribution's exact dependencies before shipping a commercial package.
+`interface` 改为运行 SDK 的客户端实际网卡名；`domain_id` 与目标机器人 DDS Bridge 的对外 `domain_id` 一致，上述数值仅为示例，不叠加桥内部的 `external_domain_offset`。机器人端应已启动桥和仲裁服务，并允许外部动作源控制。
 
-### 2. Build CycloneDDS 11.0.1 (static)
+数据通路为：**输入CSV → SDK 本地播放 → DDS Bridge → 仲裁层 → 机器人执行**。SDK 负责将动作封装到 `/aheadform/control/aheadmotion`，客户无需自行创建 DDS Topic，也无需处理 Protobuf 通路中的 104 字节表情量化格式。
 
-```bash
-git clone --branch 11.0.1 --depth 1 https://github.com/eclipse-cyclonedds/cyclonedds.git
-cmake -S cyclonedds -B cyclonedds/build -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_INSTALL_PREFIX=/opt/cyclonedds-11.0.1-static \
-  -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED_LIBS=OFF \
-  -DENABLE_SECURITY=OFF -DENABLE_SSL=OFF \
-  -DBUILD_EXAMPLES=OFF -DBUILD_TESTING=OFF
-cmake --build cyclonedds/build -j"$(nproc)"
-sudo cmake --install cyclonedds/build
-```
+## 2. CSV 格式和单位
 
-If you installed CycloneDDS elsewhere, pass `CYCLONEDDS=<path>` to `make`.
+示例文件无需重排表头。SDK 按列名识别动作，映射到固定的 52 路 ARKit 顺序，不按 CSV 列位置直接复制。
 
-## Build and run
+| CSV 字段 | 约定 |
+|---|---|
+| `EyeBlinkLeft` 至 `TongueOut` 等完整 52 路表情列 | 归一化权重，范围 `[0,1]` |
+| `HeadPitch`、`HeadYaw`、`HeadRoll` | 头部俯仰、偏航、侧倾，单位为弧度 `rad` |
+| `LeftEyePitch`、`LeftEyeYaw`、`RightEyePitch`、`RightEyeYaw` | 左右眼俯仰、偏航，单位为弧度 `rad` |
+| `LeftEyeRoll`、`RightEyeRoll` | 可以保留；当前 DDS 动作消息无对应字段，不下发 |
+| `Timecode`、`BlendshapeCount` | 元数据，不用作播放时间或动作列数量的依据 |
 
-From the SDK repository root:
+角度不需要转成度。未提供的头部位移在完整动作消息中填 `0`。首版要求完整 52 路表情及上述 7 路头眼角度；缺列、空值、非有限数或表情权重越界时报错，不静默补齐缺失姿态。仅含表情的 test2 暂不列为首版可直接播放格式。
 
-```bash
-make                         # Build all examples into build/
-make build/Volume_demo       # Build one example
-make clean                   # Remove build/
-```
+角度极性以**机器人自身视角**为准：
 
-Before running an example, set `NETWORK_INTERFACE`, `DOMAIN_ID`, and `AHEADFORM_CONFIG` in the relevant `user/src/*_demo.c` file to match your computer and robot, then rebuild.
+| 姿态 | 正值 | 负值 |
+|---|---|---|
+| 头部 Pitch | 低头，下巴向下 | 抬头，下巴向上 |
+| 头部 Yaw | 向左转头 | 向右转头 |
+| 头部 Roll | 向右侧倾，右耳靠近右肩 | 向左侧倾，左耳靠近左肩 |
+| 左右眼 Pitch | 向下看 | 向上看 |
+| 左右眼 Yaw | 向右看 | 向左看 |
 
-```bash
-./build/Volume_demo 1             # Query microphone/speaker volumes
-./build/ReadHardwareState_demo 1  # Read hardware state
-```
+播放时显式传入源帧率 `30.0`。首行数据时间为 `0`，第 `i` 行数据时间为 `i / fps` 秒，`i` 从 0 开始；不将此批文件中的 `Timecode` 当作秒时间戳。帧率必须为有限正数。SDK 在后台按时间轴调度，调用者无需逐行发送或自行延时。
 
-Run an example without arguments to display its usage instructions.
+## 3. 主要接口
 
-## Quick start
+包含 `AheadForm_Task.h`，使用总句柄 `AHEADFORM_ALL_CTRL`。所有接口成功返回 `RET_SUCCESS`，失败返回错误码；可调用 `PrintAllErrLog()` 查看已记录的原因。
 
 ```c
-#include "AheadForm.h"
-#include <stdio.h>
+typedef enum
+{
+	AHEADFORM_PLAYBACK_STATE_PLAYING = 0,
+	AHEADFORM_PLAYBACK_STATE_PAUSED,
+	AHEADFORM_PLAYBACK_STATE_STOPPED,
+	AHEADFORM_PLAYBACK_STATE_FINISHED,
+	AHEADFORM_PLAYBACK_STATE_FAILED
+} ENUM_AHEADFORM_PLAYBACK_STATE;
+
+typedef struct
+{
+	ENUM_AHEADFORM_PLAYBACK_STATE state;
+	double position_s;
+	double duration_s;
+	int errorCode;
+} AHEADFORM_PLAYBACK_INFO;
+
+int AheadForm_Init(AHEADFORM_ALL_CTRL *pstAheadForm, const char *iniConfigFilePath);
+int AheadForm_Deinit(AHEADFORM_ALL_CTRL *pstAheadForm);
+int AheadForm_PlayCsvScript(AHEADFORM_ALL_CTRL *pstAheadForm, const char *csvFilePath, double fps, unsigned long long *pTaskId);
+int AheadForm_PausePlayback(AHEADFORM_ALL_CTRL *pstAheadForm, unsigned long long taskId);
+int AheadForm_ResumePlayback(AHEADFORM_ALL_CTRL *pstAheadForm, unsigned long long taskId);
+int AheadForm_StopPlayback(AHEADFORM_ALL_CTRL *pstAheadForm, unsigned long long taskId);
+int AheadForm_GetPlaybackInfo(AHEADFORM_ALL_CTRL *pstAheadForm, unsigned long long taskId, AHEADFORM_PLAYBACK_INFO *pstInfo);
+```
+
+`AheadForm_Init` 完成共享通信及业务初始化，无需另外初始化 Topics。`AheadForm_PlayCsvScript` 完成文件加载和格式检查后返回任务编号，由后台继续播放；只有成功时输出的任务编号有效，每个实例同时只运行一个播放任务，播放中或暂停时再次启动会报错。
+
+暂停冻结本地时间轴，继续从暂停位置恢复；停止结束后续发送。`GetPlaybackInfo` 返回当前任务的本地位置和总时长，单位为秒；总时长为最后一帧的时间，即 `(数据行数 - 1) / fps`。状态为 `FAILED` 时 `errorCode` 为非零播放错误码，其余状态为 `RET_SUCCESS`。查询成功仍须检查播放状态，以区分任务失败和查询失败。
+
+任务结束后可查询其最终状态，直至成功启动下一任务或销毁 SDK。任务编号仅用于所属实例；无效或已失效编号报错。`AheadForm_Deinit` 结束后台播放并等待任务退出后释放资源；初始化成功后，不论播放成功或失败，都应调用它。
+
+## 4. 最小 C 示例
+
+以下为 Linux/POSIX 调用示例。CSV 路径位于运行 SDK 的客户端；相对路径以程序工作目录为基准。示例每 100 ms 查询一次进度，该间隔与 CSV 的 30 fps 相互独立。
+
+```c
+#define _POSIX_C_SOURCE 200809L
+#include <time.h>
+#include "AheadForm_Task.h"
 
 int main(void)
 {
-    AHEADFORM_CONFIG cfg = {
-        .NetworkInterface = "ens38",        /* Your local network interface */
-        .DomainId = 50,                      /* Must match the robot */
-        .MulticastAddr = "239.255.42.1",    /* Media multicast address */
-        .VideoPort = 5600,
-        .MicPort = 5602,
-        .PlaybackPort = 5604,
-        .DeviceIp = "192.168.110.51"
-    };
+	AHEADFORM_ALL_CTRL stAheadForm = {0};
+	AHEADFORM_PLAYBACK_INFO stInfo;
+	struct timespec stPollInterval = {0, 100000000};
+	unsigned long long taskId = 0;
+	int ret, exitCode = EXIT_SUCCESS;
 
-    AHEADFORM_HANDLE *h = AheadForm_Init(&cfg);
-    if (h == NULL) {
-        PrintAllErrLog();
-        return 1;
-    }
+	if ( (ret = AheadForm_Init(&stAheadForm, "aheadform.ini")) != RET_SUCCESS )
+	{
+		PrintAllErrLog();
+		return EXIT_FAILURE;
+	}
 
-    VOLUME volume = {0};
-    if (AheadForm_QueryVolume(h, &volume) == RET_SUCCESS)
-        printf("mic=%.1f%% spk=%.1f%%\n",
-               volume.MicrophonePercent, volume.SpeakerPercent);
-    else
-        PrintAllErrLog();
+	if ( (ret = AheadForm_PlayCsvScript(&stAheadForm, "test1_30fps/FF_NR_C_arkit61_lp.csv", 30.0, &taskId)) == RET_SUCCESS )
+	{
+		while (1)
+		{
+			if ( (ret = AheadForm_GetPlaybackInfo(&stAheadForm, taskId, &stInfo)) != RET_SUCCESS )
+				break;
 
-    AheadForm_Free(h);
-    return 0;
+			printf("playback %.2f / %.2f s\r\n", stInfo.position_s, stInfo.duration_s);
+			if (stInfo.state == AHEADFORM_PLAYBACK_STATE_FAILED)
+			{
+				ret = stInfo.errorCode;
+				break;
+			}
+
+			if (stInfo.state == AHEADFORM_PLAYBACK_STATE_FINISHED || stInfo.state == AHEADFORM_PLAYBACK_STATE_STOPPED)
+				break;
+
+			if (nanosleep(&stPollInterval, NULL) < 0)
+			{
+				printf("%s() call nanosleep() failed: %s\r\n", __FUNCTION__, strerror(errno));
+				exitCode = EXIT_FAILURE;
+				break;
+			}
+		}
+	}
+
+	if (ret != RET_SUCCESS)
+	{
+		printf("SDK error: 0x%08x\r\n", (unsigned int)ret);
+		PrintAllErrLog();
+		exitCode = EXIT_FAILURE;
+	}
+
+	if ( (ret = AheadForm_Deinit(&stAheadForm)) != RET_SUCCESS )
+	{
+		PrintAllErrLog();
+		exitCode = EXIT_FAILURE;
+	}
+
+	return exitCode;
 }
 ```
 
-Save as `user/src/Customer_demo.c`, then run:
-
-```bash
-make build/Customer_demo
-./build/Customer_demo
-```
-
-> Configuration values above are examples only, not production defaults. All `AHEADFORM_CONFIG` fields must be supplied. String values must be null-terminated.
-
-## Configuration
-
-| Field | Example | Meaning |
-| --- | --- | --- |
-| `NetworkInterface` | `ens38` | Local interface used for DDS and media multicast |
-| `DomainId` | `50` | DDS domain ID (`0–232`); must match robot |
-| `MulticastAddr` | `239.255.42.1` | Media multicast address (not DDS discovery multicast) |
-| `VideoPort` | `5600` | Video RTP/UDP receiver port |
-| `MicPort` | `5602` | Microphone RTP/UDP receiver port; must differ from video port |
-| `PlaybackPort` | `5604` | Speaker playback RTP/UDP port |
-| `DeviceIp` | `192.168.110.51` | Robot unicast address for speaker audio |
-
-## API overview
-
-Public APIs are declared in `API/inc/AheadForm.h`; error definitions are in `API/inc/AheadFormError.h`.
-
-### Lifecycle
-
-| Function | Description |
-| --- | --- |
-| `AheadForm_Init` | Initialize SDK and return a device handle |
-| `AheadForm_Free` | Release handle; stop background work and media receive first |
-
-### Motion and status
-
-| Function | Description |
-| --- | --- |
-| `AheadForm_SendNeckPose` | Control neck pitch/yaw/roll |
-| `AheadForm_SendHeadMotion` | Send neck, eyes, and 52 facial blendshape values |
-| `AheadForm_SendFaceExpression` | Send eye pose and facial blendshape values |
-| `AheadForm_SendFaceServoAngles` | Send 20 low-level face-servo logic angles (privileged/internal capability) |
-| `AheadForm_ReadHardwareState` | Read online/ready/fault/E-stop/control-permission status |
-| `AheadForm_ReadNeckState` | Read neck connection, pose, and feedback state |
-| `AheadForm_ReadSensorState` | Read sensor/IMU state |
-| `AheadForm_ReadFaceState` | Read face connection and feedback state |
-
-### Audio/video and scripts
-
-| Function | Description |
-| --- | --- |
-| `AheadForm_StartVideoReceive` / `StopVideoReceive` | Receive H.264 Annex-B access units via callback |
-| `AheadForm_StartAudioReceive` / `StopAudioReceive` | Receive microphone S16LE PCM via callback |
-| `AheadForm_SaveVideo` / `SaveAudio` | Record H.264 / WAV for the specified duration in milliseconds |
-| `AheadForm_PlayAudioFile` | Play supported MP3 or WAV audio file |
-| `AheadForm_WritePlaybackAudio` | Send speaker PCM in fixed 20 ms frames |
-| `AheadForm_PlayScript` | Start a scripted performance |
-| `AheadForm_PauseScript` / `ResumeScript` / `StopScript` | Control active script |
-| `AheadForm_TakeScriptEvent` | Read script-related events |
-
-Other available APIs include volume/audio-device management, operating-mode switching, request/reply operations, and generic DDS topic publishing/subscription.
-
-**Return values:** A successful business API call returns `RET_SUCCESS` (`0`). Use `ret != RET_SUCCESS` to detect failures and `AheadFormSdk_ErrName(ret)` to obtain an error name.
-
-**Important:** A successful DDS send means the command was accepted by the local DDS writer, **not** that the robot physically completed the action. Check device status and control permissions.
-
-## Examples
-
-The repository includes 13 independently compiled examples in `user/src/`:
-
-| Example | Demonstrates |
-| --- | --- |
-| `Volume_demo` | Query/set volume and generic volume APIs |
-| `Audio_demo` | Audio device management |
-| `OperateMode_demo` | Switch `DEV` / `INTERACTIVE` mode |
-| `SendNeckPose_demo` | Neck pose control |
-| `SendHeadMotion_demo` | Neck/eye/blendshape head motion |
-| `SendFaceExpression_demo` | Eye and face expression control |
-| `SendFaceServoAngles_demo` | Low-level face-servo control |
-| `ReadHardwareState_demo` | Hardware state |
-| `ReadNeckState_demo` | Neck state |
-| `ReadSensorState_demo` | Sensor/IMU state |
-| `ReadFaceState_demo` | Face state |
-| `Script_demo` | Script playback, state, and events |
-| `Media_demo` | Video/mic receive, capture, audio playback, PCM streaming |
-
-## Data formats and constraints
-
-| Data | Current SDK convention |
-| --- | --- |
-| Motion command angles | **Degrees** |
-| Facial blendshapes | 52 channels, each in `[0, 1]` |
-| State neck/IMU pose | **Radians** in the documented pose fields |
-| State motor/servo angles | Degrees in `*Deg` and `*LogicDeg` fields |
-| Microphone callback | PCM S16LE, 16 kHz, mono |
-| Speaker live PCM | Exactly **640 bytes** per call (20 ms, S16LE, 16 kHz mono) |
-| WAV playback | PCM format code 1, 16 kHz, mono, S16LE |
-| Received video | H.264 Annex-B access units |
-
-Use `HasLatestSample` before consuming `LatestSample` in structures that expose this flag. A successful state API call does not guarantee that a fresh sample is available.
-
-## Error handling and troubleshooting
+暂停、继续和停止用于应用自己的控制流程。以下是三项独立操作，按用户操作选用；`pstAheadForm` 指向仍然有效的总句柄，`taskId` 来自成功启动的任务，每次调用均应检查返回值：
 
 ```c
-if (ret != RET_SUCCESS) {
-    printf("SDK error: %s\n", AheadFormSdk_ErrName(ret));
-    PrintAllErrLog();
-}
+//Pause a playing task.
+if ( (ret = AheadForm_PausePlayback(pstAheadForm, taskId)) != RET_SUCCESS )
+	return ret;
+
+//Resume a paused task.
+if ( (ret = AheadForm_ResumePlayback(pstAheadForm, taskId)) != RET_SUCCESS )
+	return ret;
+
+//Stop a playing or paused task.
+if ( (ret = AheadForm_StopPlayback(pstAheadForm, taskId)) != RET_SUCCESS )
+	return ret;
 ```
 
-Additional logging helpers include `Print1stErrLog`, `PrintLatest1ErrLog`, `StoreAllErrLogToFile`, and `ClearErrStack`.
+## 5. 常见问题
 
-| Symptom | Check |
-| --- | --- |
-| `AheadForm_Init` returns `NULL` | Error stack, network interface, DDS domain, ports, GStreamer plugins |
-| `dds/dds.h` or `libddsc.a` not found | CycloneDDS prefix and `CYCLONEDDS` build override |
-| DDS endpoint or reply timeout | Robot service, firewall, multicast, interface, QoS, domain |
-| Status has no current sample | `HasLatestSample`, connectivity, and state publisher |
-| Motion send succeeds but robot does not move | Robot mode, control permission, E-stop, fault state |
-| PCM playback rejects buffer | Frame must be exactly 640 bytes |
-| WAV/MP3 playback fails | Supported WAV PCM format or required decoder plugins |
+| 现象 | 检查方式 |
+|---|---|
+| 初始化或通信异常 | 核对 INI 路径、客户端网卡和机器人桥的对外 Domain；初始化成功本身不代表机器人已可控制 |
+| CSV 启动失败 | 检查文件路径、完整 52 路表情与 7 路头眼列、有效数值及帧率，调用 `PrintAllErrLog()` 查看原因 |
+| 本地进度正常但机器人不动 | 检查机器人运动许可、桥和仲裁服务，以及当前活动动作源；避免机器人端播放器或其他动作源与 SDK 同时争用动作流 |
+| 状态为完成，机器人是否已执行完？ | 完成表示本地动作发送完毕；实际采用、限幅及物理执行结果以机器人反馈为准 |
 
-## Privacy
-
-- Media recordings may capture personal information. Obtain appropriate consent, provide visible recording indicators where required, and define retention/deletion practices.
-
-## License
-
----
-
-© 2026 AheadForm. All rights reserved.
+暂停、停止及 SDK 销毁描述的是本地播放行为，不代表机器人急停或机械锁定。测试时由机器人端的运动许可和执行约束管理实际动作。
