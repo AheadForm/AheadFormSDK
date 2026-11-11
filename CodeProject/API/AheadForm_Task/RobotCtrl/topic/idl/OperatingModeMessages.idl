@@ -1,0 +1,27 @@
+module cloud_agent_msgs {
+module msg {
+
+enum OperatingMode {
+    UNKNOWN,
+    DEV,
+    INTERACTIVE
+};
+
+enum OperatingModeResult {
+    RESULT_UNKNOWN,
+    SUCCEEDED,
+    FAILED
+};
+
+struct OperatingModeControl {
+    unsigned long long request_id;
+    OperatingMode mode;
+};
+
+struct OperatingModeControlReply {
+    unsigned long long request_id;
+    OperatingModeResult result;
+};
+
+};
+};

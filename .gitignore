@@ -1,0 +1,39 @@
+# Compiler output and dependency files (including .Name.o.d)
+*.o
+*.o.d
+*.d
+*.a
+*.so
+*.so.*
+*.dll
+*.exe
+*.out
+/CodeProject/AheadFormSDK
+/build/
+/cmake-build-*/
+**/CMakeFiles/
+**/CMakeCache.txt
+
+# Customer scripts must stay on the customer's computer
+*.[cC][sS][vV]
+*.[mM][pP]3
+
+# Configuration backups; keep CodeProject/AheadFormSDK_Config.ini
+*.ini.bak*
+*.ini.backup*
+*.ini.old
+*.ini.orig
+*.ini.save
+*.ini~
+*.bak
+*.backup
+*~
+
+# Local editor and runtime files
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+*.log
+core
+core.*

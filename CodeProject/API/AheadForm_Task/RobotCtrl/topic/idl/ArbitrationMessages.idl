@@ -1,0 +1,554 @@
+module arbitration_msgs {
+module msg {
+
+const octet DeviceKind_DEVICE_UNKNOWN = 0;
+const octet DeviceKind_DEVICE_FACE = 1;
+const octet DeviceKind_DEVICE_NECK = 2;
+const octet DeviceKind_DEVICE_MEDIA = 3;
+const octet DeviceKind_DEVICE_POWER = 4;
+const octet DeviceKind_DEVICE_SENSOR = 5;
+
+const octet FaultSource_SOURCE_DAEMON_HELLO = 1;
+const octet FaultSource_SOURCE_DAEMON_STATUS = 2;
+const octet FaultSource_SOURCE_FACE_SERVO = 3;
+const octet FaultSource_SOURCE_NECK_MOTOR = 4;
+
+const octet HardwareFaultEvent_EVENT_RAISED = 1;
+const octet HardwareFaultEvent_EVENT_CHANGED = 2;
+const octet HardwareFaultEvent_EVENT_CLEARED = 3;
+
+const octet HardwareControlAsk_ACTION_PRINT_ERRLOG = 2;
+const octet HardwareControlAsk_ACTION_EXIT_DAEMON = 3;
+
+const octet PresetMotionAsk_ACTION_SLEEP = 1;
+const octet PresetMotionAsk_ACTION_CENTER = 2;
+
+const octet MediaChannelControlAsk_CTRL_KEEP = 0;
+const octet MediaChannelControlAsk_CTRL_DISABLE = 1;
+const octet MediaChannelControlAsk_CTRL_ENABLE = 2;
+
+const octet MediaVolumeAsk_OPERATION_SET = 1;
+const octet MediaVolumeAsk_OPERATION_GET = 2;
+
+const octet MediaAudioDeviceAsk_OPERATION_ROUTE = 1;
+const octet MediaAudioDeviceAsk_OPERATION_GET_LIST = 2;
+const octet MediaAudioDeviceAsk_OPERATION_GET_CURRENT = 3;
+const octet MediaAudioDeviceAsk_DEVICE_MIC = 0;
+const octet MediaAudioDeviceAsk_DEVICE_SPK = 1;
+
+const octet NeckMotorSample_MOTOR_YAW = 0;
+const octet NeckMotorSample_MOTOR_LEFT = 1;
+const octet NeckMotorSample_MOTOR_RIGHT = 2;
+
+const octet SafetyControlAsk_ACTION_SET_MOTION_PERMISSION = 1;
+const octet SafetyControlAsk_ACTION_REQUEST_STOP_TO_SAFE_POSE = 2;
+const octet SafetyControlAsk_ACTION_REQUEST_FAULT_CLEAR = 3;
+const octet SafetyControlAsk_ACTION_REQUEST_ESTOP = 4;
+
+const unsigned long FaceStatusSample_STATE_POSE_INITIALIZING = 0;
+const unsigned long FaceStatusSample_STATE_OPERATIONAL_MOTION_TARGET_DISABLED = 1;
+const unsigned long FaceStatusSample_STATE_OPERATIONAL_MOTION_TARGET_ENABLED = 2;
+const unsigned long FaceStatusSample_STATE_STOPPING_TO_SAFE_POSE = 3;
+const unsigned long FaceStatusSample_STATE_ESTOP_LATCHED = 4;
+const unsigned long FaceStatusSample_STATE_RECOVERABLE_FAULT = 5;
+const octet FaceStatusSample_FAULT_BIT_CONFIG_ERROR = 0;
+const octet FaceStatusSample_FAULT_BIT_UART_IO_ERROR = 1;
+const octet FaceStatusSample_FAULT_BIT_SERVO_BAD_PACKET = 2;
+const octet FaceStatusSample_FAULT_BIT_SERVO_FEEDBACK_TIMEOUT = 3;
+const octet FaceStatusSample_FAULT_BIT_SERVO_HLS_ERROR = 4;
+const octet FaceStatusSample_FAULT_BIT_ACTION_TIMEOUT = 5;
+const octet FaceStatusSample_FAULT_BIT_TRACKING_ERROR = 6;
+
+const unsigned long NeckStatusSample_STATE_WAIT_CTRL_OWNER = 0;
+const unsigned long NeckStatusSample_STATE_POSE_INITIALIZING = 1;
+const unsigned long NeckStatusSample_STATE_OPERATIONAL_MOTION_TARGET_DISABLED = 2;
+const unsigned long NeckStatusSample_STATE_OPERATIONAL_MOTION_TARGET_ENABLED = 3;
+const unsigned long NeckStatusSample_STATE_RECOVERABLE_FAULT = 4;
+const unsigned long NeckStatusSample_STATE_STOPPING_TO_SAFE_POSE = 5;
+const unsigned long NeckStatusSample_STATE_ESTOP_LATCHED = 6;
+
+const unsigned long PowerStatusSample_STATE_INITIALIZING = 0;
+const unsigned long PowerStatusSample_STATE_READY = 1;
+const unsigned long PowerStatusSample_STATE_RECOVERABLE_FAULT = 2;
+const unsigned long PowerStatusSample_STATE_ESTOP_LATCHED = 3;
+const octet PowerStatusSample_FAULT_BIT_CONFIG_ERROR = 0;
+const octet PowerStatusSample_FAULT_BIT_UPPER_BOARD_COMM_ERROR = 1;
+const octet PowerStatusSample_FAULT_BIT_LOWER_BOARD_COMM_ERROR = 2;
+const octet PowerStatusSample_FAULT_BIT_UPPER_BOARD_POWER_ERROR = 3;
+const octet PowerStatusSample_FAULT_BIT_LOWER_BOARD_POWER_ERROR = 4;
+const octet PowerStatusSample_FAULT_BIT_UPPER_BOARD_BAD_PACKET = 5;
+const octet PowerStatusSample_FAULT_BIT_UPPER_BOARD_OVERTEMP = 6;
+const octet PowerStatusSample_FAULT_BIT_FAN_ERROR = 7;
+const octet PowerStatusSample_FAULT_BIT_LOWER_BOARD_BAD_PACKET = 8;
+
+const unsigned long SensorStatusSample_STATE_INITIALIZING = 0;
+const unsigned long SensorStatusSample_STATE_READY = 1;
+const unsigned long SensorStatusSample_STATE_RECOVERABLE_FAULT = 2;
+const unsigned long SensorStatusSample_STATE_ESTOP_LATCHED = 3;
+const octet SensorStatusSample_FAULT_BIT_UART_IO_ERROR = 0;
+const octet SensorStatusSample_FAULT_BIT_IMU_BAD_PACKET = 1;
+const octet SensorStatusSample_FAULT_BIT_IMU_RPY_TIMEOUT = 2;
+
+struct Time {
+  long sec;
+  unsigned long nanosec;
+};
+
+struct EyePose {
+  float left_eye_pitch;
+  float left_eye_yaw;
+  float right_eye_pitch;
+  float right_eye_yaw;
+};
+
+struct NeckPose {
+  float pitch;
+  float yaw;
+  float roll;
+  float head_x;
+  float head_y;
+  float head_z;
+};
+
+struct AheadMotion {
+  long version;
+  double timestamp;
+  string<32> source_name;
+  NeckPose neck;
+  EyePose eyes;
+  float blendshapes[52];
+};
+
+struct NeckControl {
+  double timestamp;
+  unsigned long long command_seq;
+  string<32> source_name;
+  float pitch;
+  float yaw;
+  float roll;
+};
+
+struct FaceControl {
+  double timestamp;
+  unsigned long long command_seq;
+  string<32> source_name;
+  EyePose eyes;
+  float blendshapes[52];
+};
+
+struct FaceServoDirectTarget {
+  Time stamp;
+  unsigned long long command_seq;
+  double target_logic_deg[20];
+};
+
+struct PresetMotionAsk {
+  Time stamp;
+  unsigned long long ask_id;
+  string<32> source_name;
+  octet action;
+};
+
+struct PresetMotionReply {
+  Time stamp;
+  unsigned long long ask_id;
+  string<32> source_name;
+  long ret_code;
+};
+
+struct DeviceKind {
+  octet value;
+};
+
+struct FaultSource {
+  octet value;
+};
+
+struct DeviceConnectionState {
+  boolean handshaked;
+  boolean has_control;
+  boolean status_push_granted;
+  boolean estop_permit_granted;
+  unsigned short daemon_endpoint;
+  unsigned long daemon_state;
+  long hello_err_code;
+  boolean fault_active;
+  string daemon_name;
+};
+
+struct DeviceOperationalStatus {
+  boolean online;
+  boolean ready;
+  unsigned long state;
+  long err_code;
+  boolean fault_active;
+  boolean owner_online;
+  boolean can_ok;
+  boolean reached;
+  unsigned long long last_accepted_target_id;
+  unsigned long target_has_exec_ms;
+  unsigned long trajectory_plan_run_ms;
+};
+
+struct EyePoseData {
+  float left_eye_pitch;
+  float left_eye_yaw;
+  float right_eye_pitch;
+  float right_eye_yaw;
+};
+
+struct NeckPoseData {
+  float pitch;
+  float yaw;
+  float roll;
+  float head_x;
+  float head_y;
+  float head_z;
+};
+
+struct FaceLogicalTarget {
+  Time stamp;
+  EyePoseData eyes;
+  float blendshapes[52];
+};
+
+struct FaceServoStatus {
+  unsigned short servo_id;
+  double target_logic_deg;
+  double motion_ref_logic_deg;
+  double feedback_target_logic_deg;
+  double current_logic_deg;
+  double logic_speed_deg_s;
+  float temperature_c;
+  float voltage_v;
+  float current_a;
+  unsigned long feedback_age_ms;
+  octet hls_present_status;
+  long fault_code;
+};
+
+struct HardwareDeviceState {
+  DeviceConnectionState connection;
+  DeviceOperationalStatus operational_status;
+};
+
+struct FaceStatusSample {
+  Time stamp;
+  unsigned long long sample_seq;
+  unsigned long long msg_id;
+  unsigned long long ref_msg_id;
+  unsigned short daemon_id;
+  unsigned long state;
+  long err_code;
+  boolean ready;
+  boolean online;
+  boolean fault_active;
+  boolean owner_online;
+  unsigned long long last_accepted_target_id;
+  unsigned long long status_seq;
+  unsigned long long status_build_time_us;
+  long face_ctrl_fault_code;
+  boolean all_servo_ready;
+  unsigned long servo_count;
+  FaceServoStatus servos[20];
+};
+
+struct FaceState {
+  Time stamp;
+  HardwareDeviceState device_state;
+  boolean has_latest_sample;
+  FaceStatusSample latest_sample;
+};
+
+struct MediaChannelControlAsk {
+  Time stamp;
+  unsigned long long ask_id;
+  string source_name;
+  octet video_ctrl;
+  octet mic_ctrl;
+  octet playback_ctrl;
+  octet vad_ctrl;
+};
+
+struct MediaChannelControlReply {
+  Time stamp;
+  unsigned long long ask_id;
+  string source_name;
+  long ret_code;
+};
+
+struct MediaVolumeAsk {
+  Time stamp;
+  unsigned long long ask_id;
+  string source_name;
+  octet operation;
+  boolean has_mic_volume;
+  float mic_volume_percent;
+  boolean has_spk_volume;
+  float spk_volume_percent;
+};
+
+struct MediaVolumeReply {
+  Time stamp;
+  unsigned long long ask_id;
+  string source_name;
+  octet operation;
+  long ret_code;
+  boolean query_data_valid;
+  float mic_volume_percent;
+  float spk_volume_percent;
+};
+
+struct MediaAudioDeviceInfo {
+  string device_id;
+  string device_name;
+};
+
+struct MediaAudioDeviceAsk {
+  Time stamp;
+  unsigned long long ask_id;
+  string source_name;
+  octet operation;
+  octet device_type;
+  boolean has_mic_device;
+  string mic_device_id;
+  boolean has_spk_device;
+  string spk_device_id;
+};
+
+struct MediaAudioDeviceReply {
+  Time stamp;
+  unsigned long long ask_id;
+  string source_name;
+  octet operation;
+  long ret_code;
+  octet device_type;
+  boolean query_data_valid;
+  sequence<MediaAudioDeviceInfo, 8> devices;
+};
+
+struct HardwareControlAsk {
+  Time stamp;
+  unsigned long long ask_id;
+  string source_name;
+  octet action;
+  DeviceKind device;
+};
+
+struct HardwareControlReply {
+  Time stamp;
+  unsigned long long ask_id;
+  string source_name;
+  octet action;
+  DeviceKind device;
+  long ret_code;
+};
+
+struct HardwareFaultRecord {
+  DeviceKind device;
+  FaultSource source;
+  unsigned long object_id;
+  long err_code;
+};
+
+struct HardwareFaultActiveSet {
+  Time stamp;
+  sequence<HardwareFaultRecord> faults;
+};
+
+struct HardwareFaultEvent {
+  Time stamp;
+  unsigned long long _sequence;
+  octet event_type;
+  HardwareFaultRecord fault;
+};
+
+struct NeckPoseTarget {
+  Time stamp;
+  NeckPoseData neck;
+};
+
+struct HardwareMotionFrame {
+  boolean has_face_target;
+  boolean has_neck_target;
+  FaceLogicalTarget face;
+  NeckPoseTarget neck;
+};
+
+struct HardwareState {
+  Time stamp;
+  boolean arbiter_alive;
+  long arbiter_error_code;
+  string<128> arbiter_error_reason;
+  boolean all_online;
+  boolean all_ready;
+  boolean any_fault_active;
+  boolean any_estop_latched;
+  string<32> active_motion_source_name;
+  boolean face_motion_permitted;
+  boolean neck_motion_permitted;
+  boolean safe_stop_motion_block_active;
+};
+
+struct MediaChannelStatusSample {
+  unsigned long channel_state;
+  boolean device_available;
+  unsigned long active_reader_mask;
+  unsigned long readable_frame_count;
+  unsigned long long last_sequence;
+  unsigned long long dropped_frame_count;
+};
+
+struct MediaStatusSample {
+  Time stamp;
+  unsigned long long sample_seq;
+  unsigned long long msg_id;
+  unsigned long long ref_msg_id;
+  unsigned short daemon_id;
+  unsigned long state;
+  long err_code;
+  boolean ready;
+  boolean online;
+  boolean fault_active;
+  boolean owner_online;
+  boolean media_trans_client_connected;
+  boolean pulse_audio_aec_ready;
+  MediaChannelStatusSample video;
+  MediaChannelStatusSample mic;
+  MediaChannelStatusSample playback;
+  MediaChannelStatusSample vad;
+};
+
+struct MediaState {
+  Time stamp;
+  HardwareDeviceState device_state;
+  boolean has_latest_sample;
+  MediaStatusSample latest_sample;
+};
+
+struct NeckMotorSample {
+  octet motor_id;
+  boolean feedback_timeout;
+  octet lk_motor_state;
+  octet error_state;
+  unsigned long sample_age_ms;
+  float target_deg;
+  float last_motion_ref_deg;
+  float current_deg_raw;
+  float current_deg_filtered;
+  float speed_deg_s;
+  float temperature_c;
+  float voltage_v;
+  float current_a;
+};
+
+struct NeckStatusSample {
+  Time stamp;
+  unsigned long long sample_seq;
+  unsigned long long msg_id;
+  unsigned long long ref_msg_id;
+  unsigned short daemon_id;
+  unsigned long state;
+  long err_code;
+  boolean ready;
+  boolean online;
+  boolean fault_active;
+  boolean owner_online;
+  boolean can_ok;
+  boolean reached;
+  unsigned long long last_accepted_target_id;
+  unsigned long long status_seq;
+  unsigned long long status_build_time_us;
+  unsigned long target_has_exec_ms;
+  unsigned long trajectory_plan_run_ms;
+  NeckPoseData pose;
+  NeckMotorSample motors[3];
+};
+
+struct NeckState {
+  Time stamp;
+  HardwareDeviceState device_state;
+  boolean has_latest_sample;
+  NeckStatusSample latest_sample;
+};
+
+struct PowerStatusSample {
+  Time stamp;
+  unsigned long long sample_seq;
+  unsigned long long msg_id;
+  unsigned long long ref_msg_id;
+  unsigned long long status_build_time_us;
+  unsigned short daemon_id;
+  unsigned long state;
+  long err_code;
+  boolean ready;
+  boolean online;
+  boolean fault_active;
+  boolean owner_online;
+  boolean request_upper_power_on;
+  boolean request_lower_power_on;
+  boolean upper_power_on;
+  boolean lower_power_on;
+  boolean request_main_power_off;
+  boolean cam_work_state_led_on;
+  boolean power_switch_released;
+  octet fan_rotation_speed_percent;
+  octet temp_limit_c;
+  int8 upper_temp_c[10];
+  unsigned long upper_board_feedback_age_ms;
+  unsigned long lower_board_feedback_age_ms;
+};
+
+struct PowerState {
+  Time stamp;
+  HardwareDeviceState device_state;
+  boolean has_latest_sample;
+  PowerStatusSample latest_sample;
+};
+
+struct SensorStatusSample {
+  Time stamp;
+  unsigned long long sample_seq;
+  unsigned long long msg_id;
+  unsigned long long ref_msg_id;
+  unsigned short daemon_id;
+  unsigned long state;
+  long err_code;
+  boolean ready;
+  boolean online;
+  boolean fault_active;
+  boolean owner_online;
+  unsigned long long status_seq;
+  unsigned long long status_build_time_us;
+  unsigned long imu_rpy_feedback_age_ms;
+  float roll;
+  float pitch;
+  float yaw;
+};
+
+struct SensorState {
+  Time stamp;
+  HardwareDeviceState device_state;
+  boolean has_latest_sample;
+  SensorStatusSample latest_sample;
+};
+
+struct SafetyControlAsk {
+  Time stamp;
+  unsigned long long ask_id;
+  string source_name;
+  octet action;
+  boolean face_motion_permitted;
+  boolean neck_motion_permitted;
+};
+
+struct SafetyControlReply {
+  Time stamp;
+  unsigned long long ask_id;
+  string source_name;
+  octet action;
+  long ret_code;
+};
+
+};
+};
