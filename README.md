@@ -100,6 +100,13 @@ help
 ├── show.csv
 └── show.mp3
 ```
+注意：
+1. csv和mp3必须成对，且前缀相同，例如：show.csv和show.mp3
+2. 扬声器选择spk0,机器人可正常发声，spk1需要客户独立配置硬件资源
+  spk0  BurrBrown Speaker
+  spk1  3.5mm Audio Jack Speaker
+3. 使用PlayScript播放剧本时确保机器人处于dev调试模式,可以通过OperatingMode 1设置为dev模式
+
 
 把 `customer` 替换为实际 Linux 用户名。剧本不必放在工程、配置目录或机器人上。
 

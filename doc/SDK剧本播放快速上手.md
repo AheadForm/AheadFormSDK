@@ -335,6 +335,7 @@ exit
 | `ScriptStatus` | 查询播放状态及进度 | `ScriptStatus` |
 | `StopScript` | 停止本地剧本发送 | `StopScript` |
 | `QueryVolume` | 查询一次麦克风、扬声器音量 | `QueryVolume` |
+| `SetVolume <mic或speaker> <百分比>` | 设置指定音量，另一项保持不变 | `SetVolume speaker 30` |
 | `WatchVolume <秒数>` | 每秒查询音量并观察指定时长 | `WatchVolume 10` |
 | `PresetMotion <action>` | 请求预设动作 | `PresetMotion 2` |
 | `SendNeck <pitch_rad> <yaw_rad> <roll_rad>` | 发送单帧脖子姿态 | `SendNeck 0 0 0` |
@@ -361,9 +362,11 @@ exit
 
 `PlayScript`、`ScriptStatus`、`StopScript` 的完整流程见第 7 节。播放期间不要同时使用 SendWav 或其它直接操作扬声器发送资源的接口，也不要同时发送其它动作覆盖剧本。
 
-### 8.3 音量查询
+### 8.3 音量查询/设置
 
 `QueryVolume` 无参数，等待一次查询回复，输出麦克风和扬声器音量百分比。`WatchVolume 10` 表示连续 10 秒，每秒发送一次音量查询并打印回复；秒数为正整数。两者需要音量请求/回复 DDS 通路。
+
+`SetVolume mic 30` 设置麦克风音量为 30%；`SetVolume speaker 30` 设置扬声器音量为 30%。范围为 0～100；只修改指定的一项，不改变另一项。
 
 `WatchVolume` 期间菜单被占用，结束后返回。音量示例在源码中使用条件编译提供三种接收方法，客户使用菜单无需切换接收方法。
 

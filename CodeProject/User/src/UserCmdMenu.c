@@ -3,6 +3,7 @@
 
 #include <ctype.h>
 #include <limits.h>
+#include <math.h>
 #include <stdlib.h>
 #include <strings.h>
 #include <time.h>
@@ -12,6 +13,7 @@
 #include <unistd.h>
 
 #define VOLUME_QUERY_TIMEOUT_MS 200
+#define VOLUME_SET_TIMEOUT_MS 2000
 #define USER_CMD_REPLY_METHOD_ASYNC_REQUEST 1
 #define USER_CMD_REPLY_METHOD_RX_EVENTFD 2
 #define USER_CMD_REPLY_METHOD_READER_CALLBACK 3
@@ -29,6 +31,7 @@ static int ShellCmd(AHEADFORM_ALL_CTRL *pstAheadForm, int argc, char *argv[]);
 static int ErrLogPrint(AHEADFORM_ALL_CTRL *pstAheadForm, int argc, char *argv[]);
 static int WatchVolume(AHEADFORM_ALL_CTRL *pstAheadForm, int argc, char *argv[]);
 static int QueryVolume(AHEADFORM_ALL_CTRL *pstAheadForm, int argc, char *argv[]);
+static int SetVolume(AHEADFORM_ALL_CTRL *pstAheadForm, int argc, char *argv[]);
 static int Exit(AHEADFORM_ALL_CTRL *pstAheadForm, int argc, char *argv[]);
 
 
@@ -39,6 +42,7 @@ const USERIN_TASK gUserInTaskAry[USERIN_CMD_CNT_MAX] =
 	{"errlog", ErrLogPrint, "errlog (storeFilePath)   -- printf or store errorlog from power on"},
 	{"WatchVolume", WatchVolume, "WatchVolume seconds  \t-    eg: WatchVolume 10 means that query volume every second and print replies for 10s"},
 	{"QueryVolume", QueryVolume, "query current volume once"},
+	{"SetVolume", SetVolume, "SetVolume mic|speaker percent (0..100; other volume unchanged)"},
 	{"PresetMotion", UserCmd_PresetMotion, "PresetMotion action (1=SLEEP, 2=CENTER)"},
 	{"AudioDevice", UserCmd_AudioDevice, "AudioDevice operation type [deviceId] (op: 1=route, 2=list, 3=current; type: 0=mic, 1=speaker)"},
 	{"MediaChannel", UserCmd_MediaChannel, "MediaChannel video mic playback vad (0=keep, 1=disable, 2=enable)"},
@@ -1021,6 +1025,365 @@ static int QueryVolume(AHEADFORM_ALL_CTRL *pstAheadForm, int argc, char *argv[])
 
 	printf("mic volume = %.1f%%, speaker volume = %.1f%%.\r\n", stVolume.micVolumePercent, stVolume.spkVolumePercent);
 	return RET_SUCCESS;
+}
+#endif
+
+#if USER_CMD_REPLY_METHOD == USER_CMD_REPLY_METHOD_ASYNC_REQUEST //set volume by async request
+static int SetVolume(AHEADFORM_ALL_CTRL *pstAheadForm, int argc, char *argv[])
+{
+	AHEADFORM_VOLUME_REPLY_SAMPLE stReply;
+	AHEADFORM_VOLUME_SET_PARA stSetPara = {0};
+	char *pEnd = NULL;
+	double percent;
+	struct timeval timeout = {.tv_sec = VOLUME_SET_TIMEOUT_MS / 1000, .tv_usec = VOLUME_SET_TIMEOUT_MS % 1000 * 1000};
+	fd_set rdFdSet;
+	eventfd_t eventCnt;
+	int notifyEventfd, max_fd, cleanupRet, ret;
+
+	if ( (ret = IsUserInError(argc, argv, "3", NULL)) != RET_SUCCESS )
+		return ret;
+
+	if (strcasecmp(argv[1], "mic") == 0)
+		stSetPara.isSetMicVolume = 1;
+	else if (strcasecmp(argv[1], "speaker") == 0)
+		stSetPara.isSetSpkVolume = 1;
+	else
+		return ERR_ARGV;
+
+	errno = 0;
+	percent = strtod(argv[2], &pEnd);
+	if (pEnd == argv[2] || *pEnd != 0 || errno == ERANGE || !isfinite(percent) || percent < 0.0 || percent > 100.0)
+		return ERR_ARGV;
+
+	if (stSetPara.isSetMicVolume)
+		stSetPara.stVolume.micVolumePercent = (float)percent;
+	else
+		stSetPara.stVolume.spkVolumePercent = (float)percent;
+
+	if ( (notifyEventfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC)) <= 0 )
+	{
+		printf("%s() call eventfd(volume completion) failed: %s\r\n", __FUNCTION__, strerror(errno));
+		return ERR_EVENTFD_CREATE_FAILED;
+	}
+
+	if ( (ret = Media_SetVolumeAsync(&pstAheadForm->stRobotCtrl.stMediaCtrl, &stSetPara, VOLUME_SET_TIMEOUT_MS * 1000, notifyEventfd, &stReply)) != RET_SUCCESS )
+	{
+		if ( (cleanupRet = Media_CancelVolumeAsyncRequest(&pstAheadForm->stRobotCtrl.stMediaCtrl, notifyEventfd)) != RET_SUCCESS )
+		{
+			printf("%s() Media_CancelVolumeAsyncRequest(notifyEventfd = %d) failed, ret = 0x%08X; 退出 AheadFormSDK。\r\n", __FUNCTION__, notifyEventfd, cleanupRet);
+			PrintAllErrLog();
+			exit(EXIT_FAILURE);
+		}
+
+		if (close(notifyEventfd) < 0)
+		{
+			printf("%s() call close(notifyEventfd = %d) failed: %s\r\n", __FUNCTION__, notifyEventfd, strerror(errno));
+			return ERR_EVENTFD_IO_FAILED;
+		}
+
+		return ret;
+	}
+	max_fd = notifyEventfd;
+	while (1)
+	{
+		FD_ZERO(&rdFdSet);
+		FD_SET(notifyEventfd, &rdFdSet);
+		//Other application fds can share this select set and use their own FD_ISSET handlers.
+		if ( (ret = select(max_fd + 1, &rdFdSet, NULL, NULL, &timeout)) < 0 )
+		{
+			printf("%s() call select(notifyEventfd = %d) failed: %s\r\n", __FUNCTION__, notifyEventfd, strerror(errno));
+			ret = ERR_SELECT;
+			break;
+		}
+		else if (ret == 0)
+		{
+			break;
+		}
+		ret = 0;
+		if (FD_ISSET(notifyEventfd, &rdFdSet))
+		{
+			ret = Media_CheckIsVolumeAsyncRequestReplied(&pstAheadForm->stRobotCtrl.stMediaCtrl, notifyEventfd);
+			break;
+		}
+
+		if (timeout.tv_sec == 0 && timeout.tv_usec == 0)
+			break;
+	}
+
+	if ( (cleanupRet = Media_CancelVolumeAsyncRequest(&pstAheadForm->stRobotCtrl.stMediaCtrl, notifyEventfd)) != RET_SUCCESS )
+	{
+		printf("%s() Media_CancelVolumeAsyncRequest(notifyEventfd = %d) failed, ret = 0x%08X; 退出 AheadFormSDK。\r\n", __FUNCTION__, notifyEventfd, cleanupRet);
+		PrintAllErrLog();
+		exit(EXIT_FAILURE);
+	}
+
+	if (ret == 1 || ret == 0 || ret == ERRCODE_REQUEST_TIMEOUT)
+	{
+		//Cancel ends SDK access; a final notification resolves completion racing with cancellation.
+		if (eventfd_read(notifyEventfd, &eventCnt) == 0)
+		{
+			ret = 1;
+		}
+		else if (errno == EAGAIN)
+		{
+			ret = ERRCODE_REQUEST_TIMEOUT;
+		}
+		else
+		{
+			printf("%s() call eventfd_read(notifyEventfd = %d) failed: %s\r\n", __FUNCTION__, notifyEventfd, strerror(errno));
+			ret = ERR_EVENTFD_IO_FAILED;
+		}
+	}
+
+	if (close(notifyEventfd) < 0)
+	{
+		printf("%s() call close(notifyEventfd = %d) failed: %s\r\n", __FUNCTION__, notifyEventfd, strerror(errno));
+		return ERR_EVENTFD_IO_FAILED;
+	}
+
+	if (ret == ERRCODE_REQUEST_TIMEOUT)
+		return ERR_REQUEST_TIMEOUT;
+
+	if (ret != 1)
+		return ret;
+
+	printf("set volume askId=%llu, source=%s, remote ret=%d (acceptance result).\r\n",
+		stReply.askId, stReply.sourceName, stReply.retCode);
+	return stReply.retCode == 0 ? RET_SUCCESS : ERR_RX_FAILED;
+}
+
+#elif USER_CMD_REPLY_METHOD == USER_CMD_REPLY_METHOD_RX_EVENTFD //set volume by rxDataUpdateEventfd
+static int SetVolume(AHEADFORM_ALL_CTRL *pstAheadForm, int argc, char *argv[])
+{
+	AHEADFORM_TOPIC_READER_PARA stReaderPara = {0};
+	AHEADFORM_TOPIC_READER *pstReader = NULL;
+	AHEADFORM_VOLUME_ASK stAsk;
+	AHEADFORM_VOLUME_REPLY_SAMPLE stReply;
+	AHEADFORM_VOLUME_SET_PARA stSetPara = {0};
+	char *pEnd = NULL;
+	double percent;
+	struct timeval timeout = {.tv_sec = VOLUME_SET_TIMEOUT_MS / 1000, .tv_usec = VOLUME_SET_TIMEOUT_MS % 1000 * 1000};
+	fd_set rdFdSet;
+	eventfd_t eventCnt;
+	unsigned int i, readableElemCnt;
+	int max_fd, cleanupRet, ret;
+
+	if ( (ret = IsUserInError(argc, argv, "3", NULL)) != RET_SUCCESS )
+		return ret;
+
+	if (strcasecmp(argv[1], "mic") == 0)
+		stSetPara.isSetMicVolume = 1;
+	else if (strcasecmp(argv[1], "speaker") == 0)
+		stSetPara.isSetSpkVolume = 1;
+	else
+		return ERR_ARGV;
+
+	errno = 0;
+	percent = strtod(argv[2], &pEnd);
+	if (pEnd == argv[2] || *pEnd != 0 || errno == ERANGE || !isfinite(percent) || percent < 0.0 || percent > 100.0)
+		return ERR_ARGV;
+
+	if (stSetPara.isSetMicVolume)
+		stSetPara.stVolume.micVolumePercent = (float)percent;
+	else
+		stSetPara.stVolume.spkVolumePercent = (float)percent;
+
+	if ( (ret = Media_BuildSetVolumeRequest(&pstAheadForm->stRobotCtrl.stMediaCtrl, &stSetPara, &stAsk)) != RET_SUCCESS )
+		return ret;
+
+	if ( (pstReader = Media_RegisterVolumeReader(&pstAheadForm->stRobotCtrl.stMediaCtrl, &stReaderPara)) == NULL )
+		return ERRCODE_INIT_FAIL;
+
+	if ( (ret = Media_SendVolumeRequest(&pstAheadForm->stRobotCtrl.stMediaCtrl, &stAsk)) != RET_SUCCESS )
+	{
+		if ( (cleanupRet = Media_UnregisterVolumeReader(&pstAheadForm->stRobotCtrl.stMediaCtrl, pstReader)) != RET_SUCCESS )
+		{
+			printf("%s() Media_UnregisterVolumeReader(Reader = %p) failed, ret = 0x%08X; 退出 AheadFormSDK。\r\n", __FUNCTION__, (void*)pstReader, cleanupRet);
+			PrintAllErrLog();
+			exit(EXIT_FAILURE);
+		}
+
+		return ret;
+	}
+	max_fd = pstReader->rxDataUpdateEventfd;
+	while (1)
+	{
+		FD_ZERO(&rdFdSet);
+		FD_SET(pstReader->rxDataUpdateEventfd, &rdFdSet);
+		if ( (ret = select(max_fd + 1, &rdFdSet, NULL, NULL, &timeout)) < 0 )
+		{
+			printf("%s() call select(rxDataUpdateEventfd = %d) failed: %s\r\n", __FUNCTION__, pstReader->rxDataUpdateEventfd, strerror(errno));
+			ret = ERR_SELECT;
+			break;
+		}
+		else if (ret == 0)
+		{
+			break;
+		}
+		ret = 0;
+		if (FD_ISSET(pstReader->rxDataUpdateEventfd, &rdFdSet))
+		{
+			if (eventfd_read(pstReader->rxDataUpdateEventfd, &eventCnt) < 0 && errno != EAGAIN)
+			{
+				printf("%s() call eventfd_read(rxDataUpdateEventfd = %d) failed: %s\r\n", __FUNCTION__, pstReader->rxDataUpdateEventfd, strerror(errno));
+				ret = ERR_EVENTFD_IO_FAILED;
+				break;
+			}
+			//Consume a finite FIFO snapshot; eventCnt is only an update hint.
+			readableElemCnt = TopicReader_GetReadableElemCnt(pstReader);
+			for (i = 0; i < readableElemCnt; i++)
+			{
+				if ( (ret = TopicReader_PopElem(pstReader, &stReply)) <= 0 )
+					break;
+
+				if (Media_MatchVolumeReplyWithReq(&stReply, &stAsk))
+					break;
+
+				ret = 0;
+			}
+		}
+
+		if (ret != 0)
+			break;
+
+		if (timeout.tv_sec == 0 && timeout.tv_usec == 0)
+			break;
+	}
+
+	if ( (cleanupRet = Media_UnregisterVolumeReader(&pstAheadForm->stRobotCtrl.stMediaCtrl, pstReader)) != RET_SUCCESS )
+	{
+		printf("%s() Media_UnregisterVolumeReader(Reader = %p) failed, ret = 0x%08X; 退出 AheadFormSDK。\r\n", __FUNCTION__, (void*)pstReader, cleanupRet);
+		PrintAllErrLog();
+		exit(EXIT_FAILURE);
+	}
+
+	if (ret == 0)
+		return ERR_REQUEST_TIMEOUT;
+
+	if (ret < 0)
+		return ret;
+
+	printf("set volume askId=%llu, source=%s, remote ret=%d (acceptance result).\r\n",
+		stReply.askId, stReply.sourceName, stReply.retCode);
+	return stReply.retCode == 0 ? RET_SUCCESS : ERR_RX_FAILED;
+}
+
+#else //set volume by Reader callback
+static int SetVolume(AHEADFORM_ALL_CTRL *pstAheadForm, int argc, char *argv[])
+{
+	VOLUME_QUERY_CALLBACK_CONTEXT stContext = {.isReplied = 0};
+	AHEADFORM_TOPIC_READER_PARA stReaderPara = {CopyVolumeReplyIfMatchesReq, &stContext};
+	AHEADFORM_TOPIC_READER *pstReader = NULL;
+	AHEADFORM_VOLUME_SET_PARA stSetPara = {0};
+	char *pEnd = NULL;
+	double percent;
+	struct timeval timeout = {.tv_sec = VOLUME_SET_TIMEOUT_MS / 1000, .tv_usec = VOLUME_SET_TIMEOUT_MS % 1000 * 1000};
+	fd_set rdFdSet;
+	int max_fd, cleanupRet, ret;
+
+	if ( (ret = IsUserInError(argc, argv, "3", NULL)) != RET_SUCCESS )
+		return ret;
+
+	if (strcasecmp(argv[1], "mic") == 0)
+		stSetPara.isSetMicVolume = 1;
+	else if (strcasecmp(argv[1], "speaker") == 0)
+		stSetPara.isSetSpkVolume = 1;
+	else
+		return ERR_ARGV;
+
+	errno = 0;
+	percent = strtod(argv[2], &pEnd);
+	if (pEnd == argv[2] || *pEnd != 0 || errno == ERANGE || !isfinite(percent) || percent < 0.0 || percent > 100.0)
+		return ERR_ARGV;
+
+	if (stSetPara.isSetMicVolume)
+		stSetPara.stVolume.micVolumePercent = (float)percent;
+	else
+		stSetPara.stVolume.spkVolumePercent = (float)percent;
+
+	if ( (ret = Media_BuildSetVolumeRequest(&pstAheadForm->stRobotCtrl.stMediaCtrl, &stSetPara, &stContext.stAsk)) != RET_SUCCESS )
+		return ret;
+
+	if ( (stContext.completionEventfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC)) <= 0 )
+	{
+		printf("%s() call eventfd(volume completion) failed: %s\r\n", __FUNCTION__, strerror(errno));
+		return ERR_EVENTFD_CREATE_FAILED;
+	}
+
+	if ( (pstReader = Media_RegisterVolumeReader(&pstAheadForm->stRobotCtrl.stMediaCtrl, &stReaderPara)) == NULL )
+	{
+		if (close(stContext.completionEventfd) < 0)
+		{
+			printf("%s() call close(stContext.completionEventfd = %d) failed: %s\r\n", __FUNCTION__, stContext.completionEventfd, strerror(errno));
+			return ERR_EVENTFD_IO_FAILED;
+		}
+
+		return ERRCODE_INIT_FAIL;
+	}
+
+	if ( (ret = Media_SendVolumeRequest(&pstAheadForm->stRobotCtrl.stMediaCtrl, &stContext.stAsk)) != RET_SUCCESS )
+	{
+		if ( (cleanupRet = Media_UnregisterVolumeReader(&pstAheadForm->stRobotCtrl.stMediaCtrl, pstReader)) != RET_SUCCESS )
+		{
+			printf("%s() Media_UnregisterVolumeReader(Reader = %p) failed, ret = 0x%08X; 退出 AheadFormSDK。\r\n", __FUNCTION__, (void*)pstReader, cleanupRet);
+			PrintAllErrLog();
+			exit(EXIT_FAILURE);
+		}
+
+		if (close(stContext.completionEventfd) < 0)
+		{
+			printf("%s() call close(stContext.completionEventfd = %d) failed: %s\r\n", __FUNCTION__, stContext.completionEventfd, strerror(errno));
+			return ERR_EVENTFD_IO_FAILED;
+		}
+
+		return ret;
+	}
+	max_fd = stContext.completionEventfd;
+	while (1)
+	{
+		FD_ZERO(&rdFdSet);
+		FD_SET(stContext.completionEventfd, &rdFdSet);
+		if ( (ret = select(max_fd + 1, &rdFdSet, NULL, NULL, &timeout)) < 0 )
+		{
+			printf("%s() call select(completionEventfd = %d) failed: %s\r\n", __FUNCTION__, stContext.completionEventfd, strerror(errno));
+			ret = ERR_SELECT;
+			break;
+		}
+		else if (ret == 0)
+		{
+			break;
+		}
+		ret = RET_SUCCESS;
+		if (FD_ISSET(stContext.completionEventfd, &rdFdSet))
+			break;
+
+		if (timeout.tv_sec == 0 && timeout.tv_usec == 0)
+			break;
+	}
+
+	//Unregister synchronizes with callbacks before this thread reads their output.
+	if ( (cleanupRet = Media_UnregisterVolumeReader(&pstAheadForm->stRobotCtrl.stMediaCtrl, pstReader)) != RET_SUCCESS )
+	{
+		printf("%s() Media_UnregisterVolumeReader(Reader = %p) failed, ret = 0x%08X; 退出 AheadFormSDK。\r\n", __FUNCTION__, (void*)pstReader, cleanupRet);
+		PrintAllErrLog();
+		exit(EXIT_FAILURE);
+	}
+
+	if (close(stContext.completionEventfd) < 0)
+	{
+		printf("%s() call close(stContext.completionEventfd = %d) failed: %s\r\n", __FUNCTION__, stContext.completionEventfd, strerror(errno));
+		return ERR_EVENTFD_IO_FAILED;
+	}
+
+	if (ret != RET_SUCCESS)
+		return ret;
+
+	if (!stContext.isReplied)
+		return ERR_REQUEST_TIMEOUT;
+
+	printf("set volume askId=%llu, source=%s, remote ret=%d (acceptance result).\r\n",
+		stContext.stReply.askId, stContext.stReply.sourceName, stContext.stReply.retCode);
+	return stContext.stReply.retCode == 0 ? RET_SUCCESS : ERR_RX_FAILED;
 }
 #endif
 
