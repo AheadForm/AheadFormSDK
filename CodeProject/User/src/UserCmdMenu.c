@@ -52,7 +52,7 @@ const USERIN_TASK gUserInTaskAry[USERIN_CMD_CNT_MAX] =
 	{"WatchStatus", UserCmd_WatchStatus, "WatchStatus hardware|events seconds"},
 	{"WatchMedia", UserCmd_WatchMedia, "WatchMedia video|mic seconds"},
 	{"SendWav", UserCmd_SendWav, "SendWav mono_16k_s16le.wav"},
-	{"PlayScript", UserCmd_PlayScript, "PlayScript intro+clzy.csv (same-basename MP3)"},
+	{"PlayScript", UserCmd_PlayScript, "PlayScript show.csv (same-basename MP3)"},
 	{"StopScript", UserCmd_StopScript, "StopScript"},
 	{"ScriptStatus", UserCmd_ScriptStatus, "ScriptStatus"},
 	{"exit", Exit, "exit"},

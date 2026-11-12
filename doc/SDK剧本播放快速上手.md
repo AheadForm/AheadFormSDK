@@ -232,6 +232,16 @@ ReadStatus hardware latest
 
 输出中的 `online`、`ready`、`fault`、`estop` 和 `source` 分别表示整机在线、就绪、故障、急停及当前动作来源。播放前应确保机器人已就绪、急停已解除，并等待其它动作来源释放；空闲时 `source=` 为空。
 
+若 `source=face_fusion_brain`，可在 SDK 菜单请求退出交互模式、切换到 DEV 开发模式：
+
+```text
+OperatingMode 1
+```
+
+确认回复为 `operating mode requestId=..., result=1.`，表示远端报告切换成功。`result=2` 表示失败；请求超时不能视为切换成功，应检查机器人对应服务以及 `/system/operating_mode/control`、`/system/operating_mode/control/reply` 的 DDS Bridge 通路。
+
+收到成功回复后，再次执行 `ReadStatus hardware latest`，等待动作源释放、`source=` 为空，再启动剧本。需要恢复交互时使用 `OperatingMode 2`。`PlayScript` 不会自动退出交互模式；`StopScript` 只停止 SDK 自己的剧本，不执行模式切换。
+
 若只显示统计而没有状态样本，等待下一帧再查询，并检查状态 Topic 的外部通路。播放需要最近一秒内的整机状态。
 
 **这条菜单指令不直接打印脸部和脖子运动许可。** 播放线程会检查许可、急停及安全停止状态；出现 `robot motion blocked: facePermit=... neckPermit=... estop=... safeStop=...` 时，根据字段和机器人当前状态处理。其它程序持有动作来源时会打印 `robot motion owned by ...`；按机器人既有流程结束该来源，不要改成其它程序的来源名称争抢控制。
@@ -250,7 +260,7 @@ PlayScript /home/customer/AheadFormScripts/show.csv
 PlayScript "/home/customer/my scripts/show.csv"
 ```
 
-`PlayScript` 成功返回仅表示后台任务已启动。CSV 校验、MP3 解码和发送异步进行，菜单可以继续接收指令。当前不支持 `./AheadFormSDK /path/to/show.csv` 启动播放，也没有暂停、继续或循环播放指令。
+菜单显示 `cmd[PlayScript] succeed.` 仅表示后台任务已启动。CSV 校验、MP3 解码和发送异步进行，后续是否播放成功应通过 `ScriptStatus` 和日志判断；菜单可以继续接收指令。当前不支持 `./AheadFormSDK /path/to/show.csv` 启动播放，也没有暂停、继续或循环播放指令。
 
 ### 7.4 查看进度与完成结果
 
@@ -273,6 +283,22 @@ script state=... result=0x........ elapsed=...s duration=...s motion=已发/总�
 | `elapsed`、`duration` | 已用时间与计划发送时间，单位秒 |
 | `motion`、`PCM` | 动作帧和 PCM 帧的已发送数量/总数量 |
 | `first-motion-delay` | 动作首帧相对音频首帧提交的时间差，单位微秒；尚未发送首帧时可为 0 |
+
+`SendScript()` 结束日志中的 `motion=0 PCM=0` 表示已成功提交的动作帧和 PCM 帧数均为零；尚未发送首帧时，`first-motion-delay=0`。结合 `state`、`result` 和完整日志定位失败阶段。
+
+当 `state=5 result=0x90000400` 时，表示 CSV 校验或 MP3 加载、解码阶段发生文件格式错误。在 SDK 菜单查询：
+
+```text
+ScriptStatus
+errlog
+```
+
+结合本次播放的完整终端输出和 `errlog` 中的函数名、行号区分原因：
+
+- 指向 `Head_LoadMotionCsv` 或 `ParseMotionRow`：按第 9.1 节检查 CSV 的 63 列表头、大小写、空值、数值范围和时间戳；如有 `rejected ... near line ...`，结合该提示排查。
+- 指向 `Media_LoadMp3Pcm`：检查 CSV 同目录、同名的 `.mp3` 是否存在、可读且内容能正确解码；保留 `decode MP3(...) failed` 等错误信息。插件缺失时按下方常见问题检查 GStreamer 环境。
+
+播放线程先校验 CSV、解码 MP3，再检查动作源和运动许可。因此，需要先修复文件加载错误；修复后若报告 `robot motion owned by ...` 或 `robot motion blocked: ...`，再按第 7.2 节处理模式、动作源和许可。
 
 音频在电脑上解码为 16 kHz、单声道、S16LE PCM，每 20 ms 发送 640 字节，末帧不足补零。首帧 PCM 成功提交后建立时间起点，动作首帧安排在其后 **150 ms**，之后按 CSV 时间戳发送。某条轨道先结束时，另一条继续发送；两条通路均结束后任务才完成。
 
@@ -484,7 +510,10 @@ Init、Play、Stop、Deinit 由客户串行调用；Info 可在初始化成功�
 | 运行报动态库或插件缺失 | 终端运行 `ldd ./AheadFormSDK`、`gst-inspect-1.0 mpg123audiodec`；按需要重新部署依赖，注意脚本会备份并覆盖配置 |
 | 初始化发现超时 | 核对机器人已启动、有线桥接、路由网卡、外部 DDS 域、组播、防火墙及机器人 Bridge |
 | PlayScript 指令不存在 | 确认在 SDK 菜单中输入，且运行的是本次构建的程序；用 help 查看 |
-| PlayScript 返回成功但没有播放 | 成功只表示任务已启动，继续查 ScriptStatus；检查 CSV、同名 MP3、权限及后台加载错误 |
+| PlayScript 返回成功但没有播放 | 菜单 succeed 只表示后台任务已启动，继续查 ScriptStatus；检查 CSV、同名 MP3、权限及后台加载错误 |
+| state=5，result=0x90000400 | 文件加载格式错误；按第 7.4 节结合完整日志与 errlog 区分 CSV 校验和 MP3 加载、解码失败 |
+| motion=0、PCM=0 | 已发送帧数均为零；结合 state、result 和完整日志定位失败阶段，说明见第 7.4 节 |
+| 机器人持续交互或待机动作，source=face_fusion_brain | 按第 7.2 节执行 OperatingMode 1；确认远端 result=1，并等待动作源释放后播放；PlayScript、StopScript 不执行模式切换 |
 | 找不到 MP3 | 检查 CSV 和 MP3 是否同目录同名，后缀是否为 .mp3；使用 realpath 得到的实际 CSV 路径 |
 | 路径含空格或使用 ~ 无法打开 | 在 SDK 菜单用引号包围实际绝对路径，菜单不展开 ~、$HOME |
 | ReadStatus 没有样本或状态陈旧 | 等待新状态，检查接收时间及该状态 Topic 的 Bridge 通路；缓存存在不表示持续收到新数据 |
