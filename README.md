@@ -9,7 +9,7 @@ AheadFormSDK 是首形科技（AheadForm）面向仿生机器人提供的开放�
 
 ## How It Works
 
-![AheadForm SDK Architecture](assets/sdk_architecture.png)
+![AheadForm SDK Architecture](sdk_architecture.png)
 
 SDK 是连接智能应用与机器人硬件的桥梁：客户应用通过 SDK 下发动作、剧本与音频，机器人通过 SDK 返回摄像头、麦克风及设备状态数据，形成感知与表达的闭环。
 
