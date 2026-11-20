@@ -7,23 +7,31 @@ GIT_DIRTY_SUFFIX := $(shell if test -n "$$(git -c core.autocrlf=true status --po
 BUILD_TIME := $(shell TZ=Asia/Shanghai date '+%Y-%m-%dT%H:%M:%S%:z' 2>/dev/null || printf 'unknown')
 BUILD_USER := $(shell id -un 2>/dev/null || whoami 2>/dev/null || printf 'unknown')
 
-src_dirs := $(shell find . -type d -name src)
-srcs := $(foreach dir,$(src_dirs),$(wildcard $(dir)/*.c))
+dirs := $(shell find . -type d)
+srcs := $(foreach dir,$(dirs),$(wildcard $(dir)/*.c))
 objs := $(patsubst %.c,%.o,$(srcs))
-inc_dirs := $(shell find . -type d -name inc)
-incFlags := $(foreach dir,$(inc_dirs),-I$(dir))
+incFlags := $(foreach dir,$(dirs),-I$(dir))
 
-CPPFLAGS := -D_GNU_SOURCE $(incFlags) \
+PKG_CONFIG ?= pkg-config
+
+ifneq ($(MAKECMDGOALS),clean)
+ifeq ($(shell $(PKG_CONFIG) --atleast-version=1.20 gstreamer-1.0 gstreamer-app-1.0 2>/dev/null && printf 'yes'),)
+$(error GStreamer >= 1.20 is required; detected gstreamer-1.0/gstreamer-app-1.0 versions: $(shell $(PKG_CONFIG) --modversion gstreamer-1.0 gstreamer-app-1.0 2>/dev/null || printf 'unavailable'))
+endif
+endif
+
+CYCLONEDDS_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags CycloneDDS)
+CYCLONEDDS_LIBS ?= $(shell $(PKG_CONFIG) --libs CycloneDDS)
+GSTREAMER_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags gstreamer-app-1.0)
+GSTREAMER_LIBS ?= $(shell $(PKG_CONFIG) --libs gstreamer-app-1.0)
+
+CPPFLAGS := -D_GNU_SOURCE $(incFlags) $(CYCLONEDDS_CFLAGS) $(GSTREAMER_CFLAGS) \
 	-DSX_GIT_COMMIT_HASH=\"$(GIT_HASH)$(GIT_DIRTY_SUFFIX)\" \
 	-DSX_BUILD_TIME=\"$(BUILD_TIME)\" \
 	-DSX_BUILD_USER=\"$(BUILD_USER)\"
 CFLAGS := -Wall -Werror -pthread
 LDFLAGS := -pthread
-PKG_CONFIG ?= pkg-config
-GSTREAMER_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags CycloneDDS gstreamer-app-1.0)
-GSTREAMER_LIBS ?= $(shell $(PKG_CONFIG) --libs CycloneDDS gstreamer-app-1.0)
-CPPFLAGS += $(GSTREAMER_CFLAGS)
-LDLIBS := -lm -lrt -lddsc $(GSTREAMER_LIBS)
+LDLIBS := -lm -lrt $(CYCLONEDDS_LIBS) $(GSTREAMER_LIBS)
 
 dep_files := $(foreach f,$(objs),$(dir $(f)).$(notdir $(f)).d)
 -include $(dep_files)

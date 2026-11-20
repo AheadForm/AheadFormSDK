@@ -1,0 +1,38 @@
+CC := gcc
+AR := ar
+api_lib := libAheadFormSDKApi.a
+.DEFAULT_GOAL := $(api_lib)
+
+dirs := $(shell find . -type d)
+srcs := $(foreach dir,$(dirs),$(wildcard $(dir)/*.c))
+objs := $(patsubst %.c,%.o,$(srcs))
+incFlags := $(foreach dir,$(dirs),-I$(dir))
+
+PKG_CONFIG ?= pkg-config
+
+ifneq ($(MAKECMDGOALS),clean)
+ifeq ($(shell $(PKG_CONFIG) --exists CycloneDDS 'gstreamer-1.0 >= 1.20' 'gstreamer-app-1.0 >= 1.20' && printf 'yes'),)
+$(error Build requires pkg-config, CycloneDDS and GStreamer Core/App >= 1.20)
+endif
+endif
+
+CPPFLAGS := -D_GNU_SOURCE $(incFlags) $(shell $(PKG_CONFIG) --cflags CycloneDDS gstreamer-app-1.0 2>/dev/null)
+CFLAGS := -Wall -Werror -pthread
+
+dep_files := $(foreach f,$(objs),$(dir $(f)).$(notdir $(f)).d)
+-include $(dep_files)
+
+$(api_lib): $(objs)
+	rm -f $@
+	$(AR) rcs $@ $^
+	@echo "CREATE $@"
+
+%.o: %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -MF $(dir $@).$(notdir $@).d -MT $@ -c -o $@ $<
+
+clean:
+	find . -type f \( -name '*.o' -o -name '*.o.d' \) -delete
+	rm -f $(api_lib)
+
+.DELETE_ON_ERROR:
+.PHONY: clean

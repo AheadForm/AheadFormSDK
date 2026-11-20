@@ -31,20 +31,19 @@ SDK 是连接智能应用与机器人硬件的桥梁：客户应用通过 SDK �
 
 ## Getting Started | 快速开始
 
-在客户的 Linux 电脑上播放本地剧本：读取规定格式的动作 CSV 和同名 MP3，通过 DDS 发送脸部、眼睛和脖子动作，通过 RTP/UDP 发送音频。剧本文件保留在客户电脑上，不上传到机器人。
+在客户的 Linux 电脑上用 `PlayScript` 播放本地剧本：动作 CSV 必填，可另指定 MP3 或 PCM WAV，无需同名。SDK 通过 DDS 发送脸部、眼睛和脖子动作，通过 RTP/UDP 发送音频。剧本文件保留在客户电脑上，不上传到机器人。播放机器人上已有的资源时，使用 `EmotePlayback`。
 
-SDK 还提供音量查询、动作控制、状态与故障读取、媒体设备和通道控制等菜单示例。完整步骤和全部 22 条指令见 [SDK 剧本播放快速上手](doc/SDK剧本播放快速上手.md)。
+SDK 还提供音量查询、动作控制、状态与故障读取、音频设备管理等菜单示例。部署步骤和全部 17 条指令见 [AheadFormSDK 快速上手](doc/AheadFormSDK快速上手.md)。
 
 ## 文档索引
 
 | 文档 | 用途 |
 | --- | --- |
-| [SDK 剧本播放快速上手](doc/SDK剧本播放快速上手.md) | 客户完整操作指南：部署、配置、全部菜单、CSV 格式与排障 |
-| [AheadFormSDK 快速上手](doc/AheadFormSDK快速上手.md) | 简要播放流程与当前 C API 接入 |
-| [需求与总体架构设计](doc/AheadFormSDK需求与总体架构设计.md) | 当前公开 SDK 的模块、数据流、能力和约束 |
-| [剧本播放验证记录](doc/剧本播放验证记录.md) | 历史实测结果、测试素材边界和测量限制 |
+| [AheadFormSDK 快速上手](doc/AheadFormSDK快速上手.md) | 部署、配置、全部菜单指令和工程移植 |
+| [AheadFormSDK 架构设计说明](doc/AheadFormSDK架构设计说明.md) | 模块职责、DDS 与媒体通路、错误码和构建方式 |
+| [CSV 剧本格式要求](doc/CSV剧本格式要求.md) | 动作 CSV 的字段、单位和文件要求 |
 
-公开仓库不提供内部测试剧本、CSV 或 MP3。文档中的 `show.csv/show.mp3` 为占位名称，客户需自行准备符合规定格式的文件。
+公开仓库不附带内部测试素材。文档中的 `show.csv` 和 `voice.mp3` 是示例文件名，请自行准备符合格式要求的文件。
 
 ## 1. 准备环境
 
@@ -56,24 +55,26 @@ SDK 还提供音量查询、动作控制、状态与故障读取、媒体设备�
 
 以下命令在 **Linux 终端**执行，示例将工程放在用户主目录：
 
+**机器人 IP `192.168.110.51` 和外部 DDS 域 ID `50` 仅为示例。** 执行部署前，请将 `--robot` 和 `--domain` 换成现场实际值。
+
 ```bash
 sudo apt-get update
 sudo apt-get install -y git
 cd ~
 git clone https://github.com/AheadForm/AheadFormSDK.git
 cd ~/AheadFormSDK
-bash scripts/deploy_ubuntu.sh --robot 192.168.110.51 --domain 50
+bash deploy/deploy_ubuntu.sh --robot 192.168.110.51 --domain 50
 ```
 
-将机器人 IP 和 DDS Bridge 对外通信域改成实际值。脚本按到机器人的路由选择本地有线网卡；需要显式指定时，追加 `--interface ens33`，网卡必须与路由一致。
+脚本按到机器人的路由选择本地有线网卡；需要显式指定时，追加 `--interface ens33`，将 `ens33` 换成与路由一致的实际网卡名。
 
-脚本会安装 GCC、GStreamer 开发库和插件，缺少指定版本时编译安装 CycloneDDS 11.0.1，然后检查网络、备份并生成配置、编译 SDK。**再次运行会备份并覆盖现有配置。** `--skip-packages` 仅跳过 apt 阶段，仍会检查依赖、网络、生成配置并构建。参数详见快速上手文档。
+脚本会安装构建依赖和媒体插件，检查到机器人的网络，并在缺少指定版本时下载、校验和安装 CycloneDDS 11.0.1。构建要求 GStreamer Core 和 App 均为 1.20 或更高版本。**构建及动态库检查通过后，脚本会备份并覆盖现有配置。** `--skip-packages` 仅跳过 apt 安装。
 
 ## 3. 配置放在哪里、怎样修改
 
 ```text
 ~/AheadFormSDK/
-├── scripts/deploy_ubuntu.sh
+├── deploy/deploy_ubuntu.sh
 └── CodeProject/
     ├── Makefile
     ├── AheadFormSDK_Config.ini     ← 有效配置文件
@@ -94,7 +95,7 @@ nano CodeProject/AheadFormSDK_Config.ini
 | `[media].strRobotIPv4` | 机器人音频接收目标 IPv4，当前示例为 `192.168.110.51` |
 | `[media].spkPort` / `spkPayloadType` | 与机器人扬声器 RTP 配置一致，示例 `5604` / `96` |
 
-用 `ip -4 route get 192.168.110.51` 查看本地路由网卡。保留配置中全部必需键，完整 INI 和各字段解释见快速上手文档。修改配置后重启程序即可，无需重新编译。
+将 `ip -4 route get 192.168.110.51` 中的 IP 换成实际值，可查看到机器人的本地路由网卡。核对部署生成的 [AheadFormSDK_Config.ini](CodeProject/AheadFormSDK_Config.ini)，保留文件中的必需项，按现场配置调整。修改后重启程序即可，无需重新编译。
 
 ## 4. 手动编译与启动菜单
 
@@ -102,12 +103,11 @@ nano CodeProject/AheadFormSDK_Config.ini
 
 ```bash
 cd ~/AheadFormSDK/CodeProject
-make clean
-make -j2 CC=gcc
+make
 ldd ./AheadFormSDK
 ```
 
-编译成功输出 `CREATE AheadFormSDK`；`ldd` 不应出现 `not found`。已经构建完成时直接启动：
+重新链接成功时输出 `CREATE AheadFormSDK`；`ldd` 不应出现 `not found`。确认机器人已上电至少 10 秒，再启动 SDK：
 
 ```bash
 cd ~/AheadFormSDK/CodeProject
@@ -124,61 +124,36 @@ help
 
 ## 5. 放置并播放客户剧本
 
-仓库不附带客户剧本。将符合规定格式的 CSV 与同名 MP3 放在客户电脑的同一个可读目录，例如：
+将符合规定格式的动作 CSV 放在 Linux 客户端的可读目录中。需要配音时，再准备一个 MP3 或 PCM WAV。文件不必放在 SDK 目录中。
 
-```text
-/home/customer/AheadFormScripts/
-├── show.csv
-└── show.mp3
-```
-注意：
-1. csv和mp3必须成对，且前缀相同，例如：show.csv和show.mp3
-2. 扬声器选择spk0,机器人可正常发声，spk1需要客户独立配置硬件资源
-  spk0  BurrBrown Speaker
-  spk1  3.5mm Audio Jack Speaker
-3. 使用PlayScript播放剧本时确保机器人处于dev调试模式,可以通过OperatingMode 1设置为dev模式
-
-
-把 `customer` 替换为实际 Linux 用户名。剧本不必放在工程、配置目录或机器人上。
-
-先在 SDK 菜单输入 `ReadStatus hardware latest` 查看最新状态；等待已有动作源释放，并检查机器人就绪和急停状态。播放时 SDK 还会检查运动许可，失败原因见日志。
-
-在 SDK 菜单中启动播放：
+在 SDK 菜单中，按需选择其中一条指令，将路径换成自己的文件：
 
 ```text
 PlayScript /home/customer/AheadFormScripts/show.csv
+PlayScript /home/customer/AheadFormScripts/show.csv /home/customer/AheadFormScripts/voice.mp3
 ```
 
-自动配对同目录 `show.mp3`。路径含空格时加引号；菜单不会展开 `~` 或 `$HOME`。播放异步进行，可以随后输入：
+文件路径请使用不含空格的名称；菜单不会展开 `~` 或 `$HOME`。如现场需要先切换到开发模式，在播放前输入 `OperatingMode dev`。`PlayScript` 返回后可继续输入下一条指令，或输入 `exit` 退出。
 
-```text
-ScriptStatus
-```
+带音频时，示例默认在客户端提交首帧 PCM 后延迟 150 ms 开始发送动作。实际声画时序还受网络、缓冲和机器人执行影响。动作文件的字段和单位见 [CSV 剧本格式要求](doc/CSV剧本格式要求.md)。
 
-`state=2` 表示播放中，`3` 表示本地发送完成，`5` 表示失败，应查看 `result` 和日志。需要提前停止时输入：
-
-```text
-StopScript
-```
-
-结束使用时输入 `exit`。Stop 停止后续本地发送，无法撤回机器人已经缓存的音频或动作。
-
-仅支持规定的 **63 列 CSV + MP3**。动作首帧安排在音频首帧提交后的 **150 ms**；实际声音和机械响应还受网络、缓冲和执行影响。完整格式、状态字段和操作示例见 [SDK 剧本播放快速上手](doc/SDK剧本播放快速上手.md)。
+播放机器人上已有的资源时，使用 `EmotePlayback`，传入机器人上的文件名；暂停、继续或停止这类播放使用 `EmotePlayCtrl`。
 
 ## 6. 其它主要功能
 
-以下均为启动 SDK 后输入的菜单指令；完整参数、示例和前提见快速上手文档第 8 节。
+以下均为启动 SDK 后输入的菜单指令；完整参数和输入示例见《快速上手》第 3 章。
 
 | 功能 | 指令 |
 | --- | --- |
-| 剧本播放 | `PlayScript`、`ScriptStatus`、`StopScript` |
+| 客户端剧本播放 | `PlayScript` |
+| 机器人端资源播放 | `EmotePlayback`、`EmotePlayCtrl` |
 | 音量查询 | `QueryVolume`、`WatchVolume` |
-| 动作控制 | `PresetMotion`、`SendNeck`、`SendServo`、`MotionSample` |
-| 状态与故障 | `ReadStatus`、`WatchStatus` |
-| 媒体设备、通道与收发 | `AudioDevice`、`MediaChannel`、`WatchMedia`、`SendWav` |
-| 整机控制 | `OperatingMode`、`SafetyControl`、`HardwareControl` |
+| 动作控制 | `Tx1MotionPose`、`Tx1Face`、`Tx1NeckPose`、`TxServosTargetLogicDeg` |
+| 状态与故障 | `ReadRecentState`、`WatchState` |
+| 音频设备 | `AudioDevice` |
+| 工作模式 | `OperatingMode` |
 | 帮助与诊断 | `help`、`errlog`、`shell`、`exit` |
 
-各功能需要机器人相应服务及 DDS Bridge/RTP 通路。菜单中存在指令不表示所有机器人部署均已开放对应通路。Watch 类指令和 SendWav 执行期间会占用菜单，返回后才能输入下一条指令。
+各功能需要机器人相应服务及 DDS Bridge/RTP 通路。`WatchVolume`、`WatchState` 和 `PlayScript` 返回后才能输入下一条指令。麦克风与视频 Reader、PCM 发送通过 SDK API 使用。
 
-SDK 源码与公开头文件位于 `CodeProject/API/`，菜单调用示例位于 `CodeProject/User/src/`，部署脚本位于 `scripts/`。许可证见 [LICENSE](LICENSE)。
+SDK 源码与公开头文件位于 `CodeProject/API/`，菜单调用示例位于 `CodeProject/User/`，部署脚本位于 `deploy/`。在自己的工程中链接 API 静态库的方法见 [AheadFormSDK 快速上手](doc/AheadFormSDK快速上手.md)。许可证见 [LICENSE](LICENSE)。

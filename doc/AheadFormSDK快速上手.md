@@ -1,96 +1,91 @@
 # AheadFormSDK 快速上手
 
-本文适用于当前公开 SDK，提供部署、播放和 C API 接入的简要步骤。完整配置、63 列 CSV 表头、全部菜单和排障说明见 [SDK 剧本播放快速上手](SDK剧本播放快速上手.md)。
+下文以机器人 IP `192.168.110.51` 和外部 DDS 域 ID `50` 为例，部署时请将 `--robot` 和 `--domain` 换成现场实际值。
 
-## 1. 环境与部署
+## 1. SDK 快速上手操作步骤
 
-已验证 Ubuntu 22.04 x86_64、本机 GCC 和有线桥接网络。机器人应已启动，并开放相应 DDS Bridge 与 RTP 通路。
+将 `AheadFormSDK` 复制到 Linux 客户端的运行目录，给机器人上电并确认客户端可通过有线网络访问机器人。进入 `deploy` 执行部署；如需指定网卡，在部署命令末尾加上 `--interface 网卡名`。
 
-在 Linux 终端执行：
+```sh
+cd "/你的运行目录/AheadFormSDK"
+cd deploy
+bash ./deploy_ubuntu.sh --robot 192.168.110.51 --domain 50
+```
 
-```bash
-git clone https://github.com/AheadForm/AheadFormSDK.git
-cd AheadFormSDK
-bash scripts/deploy_ubuntu.sh --robot 192.168.110.51 --domain 50
-cd CodeProject
+部署会覆盖原配置。部署成功后，打开 `../CodeProject/AheadFormSDK_Config.ini`，核对网卡、外部 DDS 域和机器人 IP，按需调整媒体参数。然后进入 `CodeProject` 编译：
+
+```sh
+cd ../CodeProject
+make
+```
+
+确认机器人已上电至少 10 秒，在当前目录启动 SDK：
+
+```sh
 ./AheadFormSDK
 ```
 
-将机器人 IP 和 DDS 对外域替换为实际值。部署脚本会备份并覆盖配置；完整参数与依赖说明见完整指南。菜单程序从当前工作目录读取 `AheadFormSDK_Config.ini`，应进入 `CodeProject` 后启动。
+启动后输入 `help` 查看菜单，再输入要运行的指令；想要退出SDK进程时输入 `exit` 退出。
 
-## 2. 准备客户自己的文件
+## 2. 环境要求和配置
 
-公开仓库不提供内部剧本 CSV、MP3 或录制数据。以下 `show.csv`、`show.mp3` 均为占位名称，需替换为客户自行准备的文件。
+推荐已验证的 Ubuntu 22.04，使用虚拟机时将网卡设为桥接模式。[部署脚本](../deploy/deploy_ubuntu.sh)会安装或检查 GCC、Make、`pkg-config`、CycloneDDS 11.0.1、GStreamer Core 和 App 1.20 或更高版本，以及音视频所需的插件。
 
-- CSV 与 MP3 放在客户 Linux 电脑的同一个可读目录，文件名主体相同。
-- CSV 恰好包含规定的 63 列：`timestamp`、`istracked`、52 个表情权重和 9 个头眼姿态字段。列名区分大小写，列顺序允许变化。
-- `timestamp` 单位为秒，首帧为 0，后续严格递增；表情权重范围为 `[0,1]`，头眼角度单位为弧度。
-- 不能缺列、重复列、增加其它列、留空值或包含空行。两个 eye roll 字段参与校验，但没有对应 DDS 发送字段。
-- PlayScript 仅配对同名 `.mp3`，不接受 WAV 作为剧本配对音频。
+如需手动调整配置，`strNetworkInterface` 填客户端连接机器人的网卡，`domain_id` 填机器人的外部 DDS 域，`strRobotIPv4` 填机器人 IP。脚本将原配置备份为同目录的 `AheadFormSDK_Config.ini.bak.*`。启动时，程序从当前工作目录读取 `AheadFormSDK_Config.ini`。
 
-完整表头与校验规则以完整指南第 9 节为准。
+## 3. 指令菜单说明
 
-## 3. 使用 SDK 菜单播放
+启动 SDK 后，在 `>>` 提示处每次输入一条指令并按回车。下表与 `help` 菜单顺序一致。`[]` 表示可选参数，输入时不带方括号；`mic/spk` 这类参数只填其中一项。文件路径和资源名请使用不含空格的名称。
 
-先在 SDK 的 `>>` 菜单输入：
+| 指令 | 功能 | 输入示例 |
+| --- | --- | --- |
+| `help` | 显示完整指令菜单。 | `help` |
+| `shell cmd` | 在运行 SDK 的 Linux 客户端执行 Shell 命令。 | `shell pwd`：查看当前工作目录。 |
+| `errlog [storeFilePath]` | 打印 SDK 错误栈，或将其导出到指定文件。空栈时不生成文件。 | `errlog`：在终端查看；`errlog ./sdk-errors.log`：导出到当前目录。 |
+| `WatchVolume seconds` | 在指定时长内立即查询一次机器人音量，随后每秒查询一次。时长填正整数。 | `WatchVolume 5`：观察音量 5 秒。 |
+| `QueryVolume` | 查询一次机器人当前音量。 | `QueryVolume` |
+| `AudioDevice mic/spk [devId]` | 列出机器人麦克风（`mic`）或扬声器（`spk`），`*` 标记当前设备；指定设备 ID 时切换。 | `AudioDevice mic`、`AudioDevice spk`：列出设备；`AudioDevice mic mic0`：选择列表中的 `mic0`，ID 以实机列表为准。 |
+| `OperatingMode [dev/interactive]` | 查询或请求切换机器人工作模式。`dev` 为开发模式，`interactive` 为交互模式。 | `OperatingMode`：查询；`OperatingMode dev`、`OperatingMode interactive`：请求切换。 |
+| `EmotePlayback [csvFileName] [audioFileName] [loop]` | 播放机器人上已有的动作（CSV）或音频（MP3、WAV），至少指定一个资源。可同时指定两种资源，顺序不限；最后加 `loop` 循环播放，循环须包含动作。资源名须带后缀，以机器人上的文件名为准。 | `EmotePlayback intro.csv`：播放动作；`EmotePlayback voice.mp3`：播放音频；`EmotePlayback intro.csv voice.mp3 loop`：循环播放两者。 |
+| `EmotePlayCtrl pause/resume/stop` | 暂停、继续或停止由 `EmotePlayback` 启动的机器人端播放。 | `EmotePlayCtrl pause`、`EmotePlayCtrl resume`、`EmotePlayCtrl stop` |
+| `PlayScript csvFilePath [audioFilePath]` | 播放 Linux 客户端上的文件。动作 CSV 必填，音频可选 MP3 或 PCM WAV；播放期间菜单等待该指令返回。 | 自行准备符合格式要求的文件。在菜单中输入 `PlayScript /home/customer/AheadFormScripts/show.csv`，或输入 `PlayScript /home/customer/AheadFormScripts/show.csv /home/customer/AheadFormScripts/voice.mp3` 加入音频；请将路径换成实际文件的路径。 |
+| `Tx1MotionPose t_us pitch_rad yaw_rad roll_rad headX headY headZ leftPitch_rad leftYaw_rad rightPitch_rad rightYaw_rad bs0 … bs51` | 发送一帧完整动作，依次填写微秒时间戳、3 个颈部角度、3 个头部位置分量、4 个眼球角度和 52 个表情权重。 | 见下方完整输入示例。 |
+| `Tx1Face leftPitch_rad leftYaw_rad rightPitch_rad rightYaw_rad bs0 … bs51` | 发送一帧面部动作，依次填写 4 个眼球角度和 52 个表情权重。 | 见下方完整输入示例。 |
+| `Tx1NeckPose pitch_rad yaw_rad roll_rad` | 发送一帧颈部姿态，依次填写俯仰、偏航、侧倾角，单位为弧度。 | `Tx1NeckPose 0.1 0 0`：俯仰目标为 0.1 弧度，其余两轴目标为 0。 |
+| `TxServosTargetLogicDeg deg0 … deg19` | 按舵机编号 0～19 发送一组脸部舵机目标逻辑角，单位为度。 | 见下方完整输入示例。 |
+| `ReadRecentState sensor/neck/faults cnt` | 读取 SDK 最近缓存的传感器、颈部或故障池快照，`cnt` 为 1～499。 | `ReadRecentState neck 1`：查看最近一条颈部状态；`ReadRecentState faults 1`：查看最近一份故障池。 |
+| `WatchState sensor/neck/faults seconds` | 在指定时长内显示新收到的传感器、颈部或故障池快照。时长填正整数。 | `WatchState neck 5`：观察颈部状态 5 秒。 |
+| `exit` | 退出 SDK。 | `exit` |
+
+下方三条长指令分别给出了全部参数，每次复制一整行到菜单。颈部和眼球角度用弧度，表情权重填 0～1，舵机逻辑角用度。示例中的 `0` 是参数值，不表示保持当前姿态；动作目标请按机器人允许的范围调整。
 
 ```text
-ReadStatus hardware latest
+Tx1MotionPose 0 0.1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+Tx1Face 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+TxServosTargetLogicDeg 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 ```
 
-确认状态持续更新、机器人就绪、急停已解除，且其它动作源已释放。若显示 `source=face_fusion_brain`，可请求退出交互：
+动作 CSV 的字段和单位见 [CSV 剧本格式要求](CSV剧本格式要求.md)。机器人未接入 IMU 时，`sensor` 没有快照或新数据是正常的。
 
-```text
-OperatingMode 1
+## 4. 架构简单说明
+
+`CodeProject/API` 提供 SDK 功能，包括连接机器人、控制动作和媒体、读取状态。客户代码通过这里的接口使用机器人功能。
+
+`CodeProject/User` 负责把 API 组合成业务流程，指令菜单就是可运行的示例。在 [UserCmdMenu.c](../CodeProject/User/UserCmdMenu.c) 中按指令名查找实现，按需复制对应的业务函数和它依赖的辅助函数。例如，`PlayScript()` 解析菜单参数后调用 `PlaybackScriptOfUser()`，自己的程序可以直接复用播放流程。
+
+## 5. 移植方法
+
+**方法一：在 `User` 中开发。** 将自己的 `.c` 和 `.h` 放入 `CodeProject/User`，可使用多级子目录。主 Makefile 会递归收集 `.c` 和头文件搜索目录，并跟踪头文件依赖，增删文件无须编辑 Makefile。删除或重命名 `.c` 后，从 SDK 根目录先执行 `make -C CodeProject clean`，再构建，避免旧代码留在可执行文件中。整个工程只保留一个 `main()`。
+
+**方法二：在自有工程中链接静态库。** 在 SDK 根目录执行：
+
+```sh
+cd CodeProject/API
+make -f subMakefile_buildApiLib
 ```
 
-只有远端回复 `result=1` 才表示远端报告切换成功；超时不能视为成功。再次读取最新状态，等待 `source=` 为空并满足运动许可后播放。
+当前目录生成 `libAheadFormSDKApi.a`。在自有工程中，将 API 下存放头文件的目录加入头文件搜索路径，由应用调用 [AheadForm_Init() 和 AheadForm_Deinit()](../CodeProject/API/AheadForm_Task/Task/AheadForm_Task.h) 完成初始化和释放。第三方头文件参数可用 `pkg-config --cflags CycloneDDS gstreamer-app-1.0` 获取。
 
-```text
-PlayScript /home/customer/AheadFormScripts/show.csv
-ScriptStatus
-```
+链接时将静态库放在调用方对象文件之后，再加入 `pkg-config --libs CycloneDDS gstreamer-app-1.0` 给出的链接参数及 `-pthread -lm -lrt`。
 
-将路径与用户名替换为实际值。菜单不会展开 `~` 或 `$HOME`。PlayScript 不自动切换模式；成功返回只表示后台任务启动，后续仍可能加载或发送失败。
-
-需要提前停止时输入 `StopScript`，结束程序输入 `exit`。停止只终止 SDK 后续发送，不能撤回机器人已缓存的数据，也不会退出其它程序的交互模式。恢复交互可请求 `OperatingMode 2`，同样需要确认远端回复。
-
-## 4. 在客户程序中调用 C API
-
-公开入口为 [AheadForm_Task.h](../CodeProject/API/AheadForm_Task/Task/inc/AheadForm_Task.h)，播放状态定义见 [Playback.h](../CodeProject/API/AheadForm_Task/Task/inc/Playback.h)。
-
-```c
-int AheadForm_Init(AHEADFORM_ALL_CTRL *pstAheadForm, const char *iniConfigFilePath);
-int AheadForm_PlayScript(AHEADFORM_ALL_CTRL *pstAheadForm, const char *csvFilePath);
-int AheadForm_GetScriptPlaybackInfo(AHEADFORM_ALL_CTRL *pstAheadForm, AHEADFORM_PLAYBACK_INFO *pstInfo);
-int AheadForm_StopScript(AHEADFORM_ALL_CTRL *pstAheadForm);
-int AheadForm_Deinit(AHEADFORM_ALL_CTRL *pstAheadForm);
-```
-
-调用顺序为初始化、启动播放、查询状态、按需停止、销毁。每一步检查返回值；初始化或业务失败需要输出错误日志，并按 API 生命周期结束已创建的资源。菜单中的实际调用示例见 [UserScriptPlayback.c](../CodeProject/User/src/UserScriptPlayback.c) 和 [main.c](../CodeProject/User/src/main.c)。
-
-Init、Play、Stop、Deinit 由应用串行调用；Info 可以在初始化成功后、销毁前并发查询，销毁前须结束应用自己的查询线程。Play 会复制路径，后台预加载 CSV 和 MP3。播放期间独占扬声器发送资源，不并发调用 SendWav 或扬声器 Start/Write/Stop。
-
-| state | 含义 |
-| --- | --- |
-| 0 | 空闲 |
-| 1 | 加载中 |
-| 2 | 播放中 |
-| 3 | 本地发送完成 |
-| 4 | 已停止 |
-| 5 | 失败，检查 result 与日志 |
-
-本地发送完成不等于机器人已物理执行完毕。当前播放入口不提供暂停、继续、循环或 taskId 参数。
-
-## 5. 常见问题
-
-| 现象 | 处理 |
-| --- | --- |
-| 菜单显示 succeed，但没有播放 | 查询 ScriptStatus，检查后台日志；succeed 仅表示任务已启动 |
-| state=5、result=0x90000400 | 文件格式错误；结合完整输出和 errlog，区分 CSV 校验与 MP3 加载、解码失败 |
-| motion=0、PCM=0 | 已发送帧数为零，结合 state/result 定位失败阶段 |
-| motion owned by face_fusion_brain | 请求 OperatingMode 1，确认 result=1，并等待动作源释放 |
-| motion blocked | 检查脸部/脖子许可、急停与安全停止字段；按机器人既有流程恢复 |
-| OperatingMode 超时 | 检查机器人服务及对应请求、回复 Topic 的 Bridge 通路 |
-
-历史实测结果与限制见 [剧本播放验证记录](剧本播放验证记录.md)。
+同一源码树切换构建入口时，先清理共用的中间文件。切换到静态库，在 `CodeProject/API` 执行 `make -f subMakefile_buildApiLib clean`；切回主程序，从 SDK 根目录执行 `make -C CodeProject clean`。
