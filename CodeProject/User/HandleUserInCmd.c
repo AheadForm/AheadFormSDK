@@ -16,7 +16,6 @@ int HandleUserInCmd(AHEADFORM_ALL_CTRL *pstAheadForm, const USERIN_TASK *userInT
 
 	do
 	{
-		printf(">>");
 		if ( (pstCmd = ParseUserIn(userInTaskAry)) != NULL )
 		{
 			ret = DispatchTask(pstAheadForm, userInTaskAry, pstCmd);
@@ -32,6 +31,8 @@ int HandleUserInCmd(AHEADFORM_ALL_CTRL *pstAheadForm, const USERIN_TASK *userInT
 		}
 	} while (bytes != 0);
 
+	printf(">>");
+	fflush(stdout);
 	return ret;
 }
 

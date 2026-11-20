@@ -26,6 +26,7 @@ int Status_Init(AHEADFORM_STATUS *pstStatus, AHEADFORM_TOPICS *pstTopics)
 	if ( (pstStatus->pstFaultPoolReader = AheadFormTopics_RegisterReader(pstTopics, AHEADFORM_TOPIC_ID_FAULT_POOL, &stReaderPara)) == NULL )
 		return ERRCODE_INIT_FAIL;
 
+	printf("%s succeed.\r\n", __FUNCTION__);
 	return RET_SUCCESS;
 }
 

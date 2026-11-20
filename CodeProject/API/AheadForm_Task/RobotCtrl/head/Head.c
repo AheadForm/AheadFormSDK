@@ -93,6 +93,7 @@ int Head_Init(AHEADFORM_HEAD_CTRL *pstHeadCtrl, AHEADFORM_TOPICS *pstTopics, con
 	if ( (pstHeadCtrl->pstServosWriter = AheadFormTopics_RegisterWriter(pstTopics, AHEADFORM_TOPIC_ID_SERVO_TARGETS)) == NULL )
 		return ERRCODE_INIT_FAIL;
 
+	printf("%s succeed.\r\n", __FUNCTION__);
 	return RET_SUCCESS;
 }
 

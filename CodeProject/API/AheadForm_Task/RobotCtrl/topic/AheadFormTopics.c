@@ -150,6 +150,7 @@ int AheadFormTopics_Init(AHEADFORM_TOPICS *pstTopics, const AHEADFORM_DDS_CFG *p
 	if ( (ret = WaitRobotDdsTopicDiscovery(pstTopics)) != RET_SUCCESS )
 		return ret;
 
+	printf("%s succeed.\r\n", __FUNCTION__);
 	return RET_SUCCESS;
 }
 

@@ -33,7 +33,7 @@ flowchart LR
 
 - `AheadForm_Init()` 的顺序是配置 → Topics → Head → Media → Status → OperatingMode → Emote；成功后才调用运行接口。`AheadForm_Deinit()` 按相反顺序执行。SDK 入口按模块逐步执行并返回首个失败，没有总句柄级的自动回滚。示例在初始化失败时打印错误并退出；接入时不要把部分初始化的句柄当作可用句柄继续调用或直接重试。
 - 初始化和释放须串行。正常退出前，应用先停止发请求、收数据的线程和事件循环，结束未完成的异步登记，注销自己注册的 Reader / Writer，再释放 SDK。媒体模块要求在释放前注销客户 MIC / Video Reader；实际释放开始后若失败，应按模块接口契约处理，不继续使用已经部分释放的句柄。
-- [`AheadFormSDK_Config.ini`](../CodeProject/AheadFormSDK_Config.ini) 的 `[dds]` 指定客户端网卡和机器人**外部** DDS 域；`[head]` 的 `sourceName` 标识动作控制来源；`[media]` 配置机器人 IP、组播、端口、负载类型和媒体启动开关。这些参数应与目标机器人一致。示例从当前工作目录读配置，自有应用可给 `AheadForm_Init()` 传入明确路径。
+- [`AheadFormSDK_Config.ini`](../CodeProject/AheadFormSDK_Config.ini) 的 `[dds]` 指定客户端网卡和机器人**外部** DDS 域；`[head]` 的 `sourceName` 标识动作控制来源；`[media]` 配置机器人 IP、组播、端口、负载类型和媒体启动开关。这些参数应与目标机器人一致。示例从当前工作目录读配置，自有应用可给 `AheadForm_Init()` 传入明确路径。字段含义、示例值和修改方法见[《快速上手》的配置字段说明](AheadFormSDK快速上手.md#配置字段说明)。
 - 当前 Topic 表配置了 17 个 DDS 端点。SDK 在初始化时等待匹配外部端点，仅与本进程实体匹配不算发现成功。机器人未就绪、外部域不匹配或链路异常都可能使初始化返回并记录 `ERR_DDS_DISCOVERY_TIMEOUT`。发现端点也不表示所有状态都有样本：不少机器人没有接入 IMU，`sensor` 为空或长期无更新可能是正常的。
 
 ## 3. DDS 通路和接收方式

@@ -356,7 +356,7 @@ int PrintAllErrLog(void)
 	if (errLogCnt)
 		printf("-------------------------------Error Log(total %u items)--------------------------------------\r\n", errLogCnt);
 	else
-		printf("error stack is empty.\r\n");
+		printf("It's normal up tp now, error stack is empty.\r\n");
 
 	for (i = (int)errLogCnt - 1; i >= 0; i--)
 	{
@@ -384,7 +384,7 @@ int Print1stErrLog(void)
 	}
 
 	if (stErrLog.errcode == RET_SUCCESS)
-		printf("error stack is empty.\r\n");
+		printf("It's normal up tp now, error stack is empty.\r\n");
 	else
 		printf("[1stError]: %s() failed at line %d, ErrCode(%s)!\r\n", stErrLog.funcName, stErrLog.errLine, GetSingleErrName(stErrLog.groupField, stErrLog.itemField));
 
@@ -410,7 +410,7 @@ int PrintLatest1ErrLog(void)
 	}
 
 	if (stErrLog.errcode == RET_SUCCESS)
-		printf("error stack is empty.\r\n");
+		printf("It's normal up tp now, error stack is empty.\r\n");
 	else
 		printf("[LastError]: %s() failed at line %d, ErrCode(%s)!\r\n", stErrLog.funcName, stErrLog.errLine, GetSingleErrName(stErrLog.groupField, stErrLog.itemField));
 

@@ -56,17 +56,37 @@ const USERIN_TASK gUserInTaskAry[USERIN_CMD_CNT_MAX] =
 	{"errlog", ErrLogPrint, "errlog [storeFilePath]   -- print or store errorlog from power on"},
 	{"WatchVolume", WatchVolume, "WatchVolume seconds   -- watch replies for the specified duration in seconds; query immediately and once per second"},
 	{"QueryVolume", QueryVolume, "query current volume once"},
-	{"AudioDevice", AudioDevice, "AudioDevice mic/spk [devId]   -- eg: AudioDevice mic: list microphones (* current)、AudioDevice mic mic0: select microphone mic0、AudioDevice spk: list speakers (* current)、AudioDevice spk spk0: select speaker spk0"},
-	{"OperatingMode", OperatingMode, "OperatingMode [dev/interactive]   -- eg: OperatingMode: Get current operating mode、OperatingMode dev: leave interactive mode"},
-	{"EmotePlayback", EmotePlayback, "EmotePlayback [csvFileName] [audioFileName] [loop]   -- eg: EmotePlayback intro.csv、EmotePlayback voice.wav、EmotePlayback voice.mp3 intro.csv loop"},
-	{"EmotePlayCtrl", EmotePlayCtrl, "EmotePlayCtrl pause/resume/stop   -- eg: EmotePlayCtrl pause、EmotePlayCtrl resume、EmotePlayCtrl stop"},
-	{"PlayScript", PlayScript, "PlayScript csvFilePath [audioFilePath]   -- eg: PlayScript intro.csv、PlayScript intro.csv voice.mp3、PlayScript intro.csv voice.wav"},
-	{"Tx1MotionPose", Tx1MotionPose, "Tx1MotionPose t_us pitch_rad yaw_rad roll_rad headX headY headZ leftPitch_rad leftYaw_rad rightPitch_rad rightYaw_rad bs0 bs1 ... bs51   -- bs: [0,1] (eg: 0.5), rad: finite radians (eg: -0.1)"},
-	{"Tx1Face", Tx1Face, "Tx1Face leftPitch_rad leftYaw_rad rightPitch_rad rightYaw_rad bs0 bs1 ... bs51   -- bs: [0,1] (eg: 0.5), rad: finite radians (eg: -0.1)"},
+	{"AudioDevice", AudioDevice, "AudioDevice mic/spk [devId]\r\n"
+								 "\t\t\t\t    <AudioDevice mic>       -- list microphones (* current)\r\n"
+								 "\t\t\t\t    <AudioDevice mic mic0>  -- select microphone mic0\r\n"
+								 "\t\t\t\t    <AudioDevice spk>       -- list speakers (* current)\r\n"
+								 "\t\t\t\t    <AudioDevice spk spk0>  -- select speaker spk0"},
+	{"OperatingMode", OperatingMode, "OperatingMode [dev/interactive]\r\n"
+								 "\t\t\t\t    <OperatingMode>         -- Get current operating mode\r\n"
+								 "\t\t\t\t    <OperatingMode dev>     -- leave interactive mode"},
+	{"EmotePlayback", EmotePlayback, "EmotePlayback [csvFileName] [audioFileName] [loop]\r\n"
+									 "\t\t\t\t    <EmotePlayback intro.csv>\r\n"
+									 "\t\t\t\t    <EmotePlayback voice.wav>\r\n"
+									 "\t\t\t\t    <EmotePlayback voice.mp3 intro.csv loop>"},
+	{"EmotePlayCtrl", EmotePlayCtrl, "EmotePlayCtrl pause/resume/stop\r\n"
+									 "\t\t\t\t    <EmotePlayCtrl pause>\r\n"
+									 "\t\t\t\t    <EmotePlayCtrl resume>\r\n"
+									 "\t\t\t\t    <EmotePlayCtrl stop>"},
+	{"PlayScript", PlayScript, "PlayScript csvFilePath [audioFilePath]\r\n"
+							   "\t\t\t\t    <PlayScript intro.csv>\r\n"
+							   "\t\t\t\t    <PlayScript intro.csv voice.mp3>\r\n"
+							   "\t\t\t\t    <PlayScript intro.csv voice.wav>"},
+	{"Tx1MotionPose", Tx1MotionPose, "Tx1MotionPose t_us pitch_rad yaw_rad roll_rad headX headY headZ leftPitch_rad leftYaw_rad rightPitch_rad rightYaw_rad bs0 bs1 ... bs51\r\n"
+									 "\t\t\t\t    bs: [0,1] (eg: 0.5), rad: finite radians (eg: -0.1)"},
+	{"Tx1Face", Tx1Face, "Tx1Face leftPitch_rad leftYaw_rad rightPitch_rad rightYaw_rad bs0 bs1 ... bs51\r\n"
+						 "\t\t\t\t    bs: [0,1] (eg: 0.5), rad: finite radians (eg: -0.1)"},
 	{"Tx1NeckPose", Tx1NeckPose, "Tx1NeckPose pitch_rad yaw_rad roll_rad   -- eg: Tx1NeckPose 0.1 0 0"},
 	{"TxServosTargetLogicDeg", TxServosTargetLogicDeg, "TxServosTargetLogicDeg deg0 deg1 ... deg19"},
-	{"ReadRecentState", ReadRecentState, "ReadRecentState sensor/neck/faults cnt(1~499)   -- eg: ReadRecentState sensor 10、ReadRecentState neck 1、ReadRecentState faults 499"},
-	{"WatchState", WatchState, "WatchState sensor/neck/faults seconds   -- eg: WatchState sensor 10"},
+	{"ReadRecentState", ReadRecentState, "ReadRecentState sensor/neck/faults cnt(1~499)\r\n"
+										 "\t\t\t\t    <ReadRecentState sensor 10>\r\n"
+										 "\t\t\t\t    <ReadRecentState neck 1>\r\n"
+										 "\t\t\t\t    <ReadRecentState faults 499>"},
+	{"WatchState", WatchState, "WatchState sensor/neck/faults seconds   -- eg: <WatchState sensor 10>"},
 	{"exit", Exit, "exit"},
 	{"\0", NULL}
 };
@@ -75,7 +95,6 @@ int PrintCmdResult(char *strCmd, int cmdRet)
 {
 	int ret = 0;
 
-	STD_INFO_PRINT("\r\n");
 	if ( (cmdRet == RET_SUCCESS) || (cmdRet == RET_EXIT) )
 	{
 		STD_INFO_PRINT("cmd[%s] succeed.\r\n", strCmd);
@@ -85,7 +104,7 @@ int PrintCmdResult(char *strCmd, int cmdRet)
 		STD_INFO_PRINT("cmd[%s] error!\r\n", strCmd);
 		PrintAllErrLog();
 	}
-	STD_INFO_PRINT("\r\n");
+
 	return ret;
 }
 
@@ -477,7 +496,7 @@ static int PrintCmdMenu(AHEADFORM_ALL_CTRL *pstAheadForm, int argc, char *argv[]
 		return ERR_ARGC;
 
 	for (i = 0; gUserInTaskAry[i].pFunction != NULL; i++)
-		STD_INFO_PRINT("\t%-16s:%s\r\n", gUserInTaskAry[i].strCmd, gUserInTaskAry[i].strDescription);
+		printf("\t%-24s:%s\r\n", gUserInTaskAry[i].strCmd, gUserInTaskAry[i].strDescription);
 
 	return RET_SUCCESS;
 }

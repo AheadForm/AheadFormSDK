@@ -95,7 +95,7 @@ nano CodeProject/AheadFormSDK_Config.ini
 | `[media].strRobotIPv4` | 机器人音频接收目标 IPv4，当前示例为 `192.168.110.51` |
 | `[media].spkPort` / `spkPayloadType` | 与机器人扬声器 RTP 配置一致，示例 `5604` / `96` |
 
-将 `ip -4 route get 192.168.110.51` 中的 IP 换成实际值，可查看到机器人的本地路由网卡。核对部署生成的 [AheadFormSDK_Config.ini](CodeProject/AheadFormSDK_Config.ini)，保留文件中的必需项，按现场配置调整。修改后重启程序即可，无需重新编译。
+将 `ip -4 route get 192.168.110.51` 中的 IP 换成实际值，可查看到机器人的本地路由网卡。核对部署生成的 [AheadFormSDK_Config.ini](CodeProject/AheadFormSDK_Config.ini)，保留文件中的必需项，按现场配置调整。修改后重启程序即可，无需重新编译。完整字段和取值范围见[配置字段说明](doc/AheadFormSDK快速上手.md#配置字段说明)。
 
 ## 4. 手动编译与启动菜单
 
@@ -116,11 +116,13 @@ cd ~/AheadFormSDK/CodeProject
 
 **程序从当前工作目录读取 `AheadFormSDK_Config.ini`，因此需要进入 `CodeProject` 后运行。** 当前没有 `--config` 参数，也不能直接把 CSV 路径作为可执行程序的启动参数。
 
-启动成功后看到 `input help will print cmdInfo...`，在 **SDK 菜单中**输入以下指令并回车：
+启动成功后看到 `>>` 提示，在 **SDK 菜单中**输入以下指令并回车：
 
 ```text
 help
 ```
+
+等到 `>>` 再次出现后，可继续输入指令。菜单中的 `<...>` 是示例，输入时只键入尖括号里的内容。
 
 ## 5. 放置并播放客户剧本
 

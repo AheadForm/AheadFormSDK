@@ -32,6 +32,7 @@ int AheadForm_Init(AHEADFORM_ALL_CTRL *pstAheadForm, const char *iniConfigFilePa
 	if ( (ret = EmotePlay_Init(&pstAheadForm->stRobotCtrl.stEmotePlayCtrl, &pstAheadForm->stTopics)) != RET_SUCCESS )
 		return ret;
 
+	printf("Above all funtion called in %s succeed.\r\n", __FUNCTION__);
 	return RET_SUCCESS;
 }
 

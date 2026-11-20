@@ -23,6 +23,7 @@ int Media_Init(AHEADFORM_MEDIA_CTRL *pstMediaCtrl, AHEADFORM_TOPICS *pstTopics, 
 	if ( (ret = Video_Init(&pstMediaCtrl->stVideoCtrl, pstCfg)) != RET_SUCCESS )
 		return ret;
 
+	printf("%s succeed.\r\n", __FUNCTION__);
 	return RET_SUCCESS;
 }
 

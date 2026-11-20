@@ -33,6 +33,7 @@ int EmotePlay_Init(AHEADFORM_EMOTE_PLAY_CTRL *pstEmotePlayCtrl, AHEADFORM_TOPICS
 	if ( (pstEmotePlayCtrl->pstEmotePlayEventReader = EmotePlay_RegisterEventReader(pstEmotePlayCtrl, &stReaderPara)) == NULL )
 		return ERRCODE_INIT_FAIL;
 
+	printf("%s succeed.\r\n", __FUNCTION__);
 	return RET_SUCCESS;
 }
 

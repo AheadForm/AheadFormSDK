@@ -15,6 +15,8 @@ int main(int argc, const char *argv[])
 		return ret;
 	}
 	printf("input help will print cmdInfo...\r\n");
+	printf(">>");
+	fflush(stdout);
 	while (ret != RET_EXIT)
 	{
 		FD_ZERO(&rdFdSet);

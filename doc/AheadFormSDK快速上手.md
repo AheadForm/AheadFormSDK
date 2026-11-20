@@ -4,7 +4,7 @@
 
 ## 1. SDK 快速上手操作步骤
 
-将 `AheadFormSDK` 复制到 Linux 客户端的运行目录，给机器人上电并确认客户端可通过有线网络访问机器人。进入 `deploy` 执行部署；如需指定网卡，在部署命令末尾加上 `--interface 网卡名`。
+将 `AheadFormSDK` 复制到 Linux 客户端的运行目录，给机器人上电并确认客户端可通过有线网络访问机器人。进入 `deploy` 执行部署。脚本默认按通往机器人 IP 的路由选择网卡；如需指定，在部署命令末尾加上 `--interface 网卡名`。
 
 ```sh
 cd "/你的运行目录/AheadFormSDK"
@@ -12,7 +12,7 @@ cd deploy
 bash ./deploy_ubuntu.sh --robot 192.168.110.51 --domain 50
 ```
 
-部署会覆盖原配置。部署成功后，打开 `../CodeProject/AheadFormSDK_Config.ini`，核对网卡、外部 DDS 域和机器人 IP，按需调整媒体参数。然后进入 `CodeProject` 编译：
+部署会覆盖原配置。部署成功后，打开 `../CodeProject/AheadFormSDK_Config.ini`，核对网卡、外部 DDS 域和机器人 IP，按需调整媒体参数（见[配置字段说明](#配置字段说明)）。然后进入 `CodeProject` 编译：
 
 ```sh
 cd ../CodeProject
@@ -25,17 +25,55 @@ make
 ./AheadFormSDK
 ```
 
-启动后输入 `help` 查看菜单，再输入要运行的指令；想要退出SDK进程时输入 `exit` 退出。
+看到 `>>` 后，输入 `help` 并按回车。菜单显示完并再次出现 `>>` 后，输入要运行的指令。输入 `exit` 退出。
 
 ## 2. 环境要求和配置
 
 推荐已验证的 Ubuntu 22.04，使用虚拟机时将网卡设为桥接模式。[部署脚本](../deploy/deploy_ubuntu.sh)会安装或检查 GCC、Make、`pkg-config`、CycloneDDS 11.0.1、GStreamer Core 和 App 1.20 或更高版本，以及音视频所需的插件。
 
-如需手动调整配置，`strNetworkInterface` 填客户端连接机器人的网卡，`domain_id` 填机器人的外部 DDS 域，`strRobotIPv4` 填机器人 IP。脚本将原配置备份为同目录的 `AheadFormSDK_Config.ini.bak.*`。启动时，程序从当前工作目录读取 `AheadFormSDK_Config.ini`。
+### 配置字段说明
+
+SDK 启动时从当前工作目录读取 [`AheadFormSDK_Config.ini`](../CodeProject/AheadFormSDK_Config.ini)。部署脚本会把旧配置备份为同目录的 `AheadFormSDK_Config.ini.bak.*`，再写入新配置。手动修改请在部署完成后进行，保存后重启 SDK 即可生效，无需重新编译。请保留以下三个节及全部字段，节名和字段名区分大小写，每个字段只填写一次。
+
+**`[dds]`：连接机器人**
+
+| 字段 | 示例值 | 含义与填写方法 |
+| --- | --- | --- |
+| `strNetworkInterface` | `ens33` | 填写 Linux 客户端连接机器人的实际网卡名，DDS 和媒体通信都使用该网卡。运行 `ip route get 192.168.110.51`（把 IP 换成实际机器人 IP），填写输出中 `dev` 后的网卡名。若启动报网卡不存在，先检查此项。 |
+| `domain_id` | `50` | 机器人 DDS Bridge 对客户端开放的 DDS 域 ID，向现场部署人员确认。应填外部域，不能填板端内部域；域不一致时 SDK 无法发现机器人。部署命令的 `--domain` 接受 `0～232`。 |
+
+**`[head]`：动作来源**
+
+| 字段 | 示例值 | 含义与填写方法 |
+| --- | --- | --- |
+| `sourceName` | `aheadform_sdk` | SDK 发送动作指令时使用的来源标识。没有现场命名要求时可沿用示例；长度 1～32 个字符，以小写字母开头，其余只允许小写字母、数字和下划线。 |
+
+**`[media]`：音视频**
+
+先按现场填写机器人 IP；组播地址、端口和 RTP 负载类型应与机器人媒体网关一致。三个开关用 `0` 或 `1`，控制 SDK 启动时是否开启对应通道。只使用菜单查询或 DDS 控制时，可以保持为 `0`。
+
+| 字段 | 示例值 | 含义与填写方法 |
+| --- | --- | --- |
+| `isVideoCaptureOn` | `0` | 是否在启动时接收机器人视频；填 `1` 时，`videoFrameSizeMax` 必须大于 0。 |
+| `isMicCaptureOn` | `0` | 是否在启动时接收机器人麦克风音频。 |
+| `isSdkPlayAudioOn` | `0` | 是否在启动时开启 SDK 向机器人扬声器发送音频的通道。填 `0` 时，有音频的 `PlayScript` 仍会按需开启通道，前提是已填写实际机器人 IP。 |
+| `multicastAddress` | `239.255.42.1` | 机器人视频和麦克风共用的 IPv4 组播地址。 |
+| `strRobotIPv4` | `192.168.110.51` | SDK 向机器人扬声器发送音频时的目标 IPv4。使用 SDK 音频播放时必须填写可达的机器人单播地址；`0.0.0.0` 表示未设定。 |
+| `videoPort` | `5600` | 客户端接收机器人视频的 UDP 端口，须与 `micPort` 不同。 |
+| `micPort` | `5602` | 客户端接收机器人麦克风音频的 UDP 端口。 |
+| `spkPort` | `5604` | 机器人接收扬声器音频的 UDP 端口。 |
+| `videoPayloadType` | `96` | 机器人发送的 H.264 视频 RTP 负载类型编号。 |
+| `micPayloadType` | `96` | 机器人发送的麦克风音频 RTP 负载类型编号。 |
+| `spkPayloadType` | `96` | 机器人扬声器接收的 RTP 负载类型编号。 |
+| `jitterBufferLatencyMax_ms` | `60` | 视频和麦克风接收端的 RTP 抖动缓冲时限，单位毫秒。网络抖动大时可适当调高，但接收延迟也会增加。 |
+| `rtpMtu` | `1400` | RTP 单包大小设置，单位字节，可填 `652～65507`。用于视频和麦克风接收的缓冲分配，以及扬声器音频的发包上限。通常沿用示例，需调整时按现场网络的 MTU 预留协议头空间。 |
+| `videoFrameSizeMax` | `0` | SDK 能缓存的单个 H.264 访问单元（AU，即一帧编码数据）的最大字节数。开启视频前按实测最大 AU 大小留出余量；超出会丢帧，填得过大则会增加内存占用。不接收视频可以填 `0`。 |
+
+UDP 端口填 `1～65535`，RTP 负载类型编号填 `0～127`；同为 `96` 是示例中的三条独立媒体流各自使用的设置。
 
 ## 3. 指令菜单说明
 
-启动 SDK 后，在 `>>` 提示处每次输入一条指令并按回车。下表与 `help` 菜单顺序一致。`[]` 表示可选参数，输入时不带方括号；`mic/spk` 这类参数只填其中一项。文件路径和资源名请使用不含空格的名称。
+下表与 `help` 菜单顺序一致。菜单里的 `<...>` 括住的是输入示例，例如看到 `<AudioDevice mic>` 时，只输入 `AudioDevice mic`，不用键入 `>>` 或尖括号。`[]` 表示可选参数，输入时不带方括号；`mic/spk` 这类参数只填其中一项。文件路径和资源名请使用不含空格的名称。
 
 | 指令 | 功能 | 输入示例 |
 | --- | --- | --- |

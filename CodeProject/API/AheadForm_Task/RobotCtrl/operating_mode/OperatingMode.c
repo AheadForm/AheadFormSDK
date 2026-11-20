@@ -29,6 +29,7 @@ int OperatingMode_Init(AHEADFORM_OPERATING_MODE_CTRL *pstOperatingModeCtrl, AHEA
 	if ( (pstOperatingModeCtrl->pstOperatingModeStateReader = AheadFormTopics_RegisterReader(pstTopics, AHEADFORM_TOPIC_ID_OPERATING_MODE_STATE, &stReaderPara)) == NULL )
 		return ERRCODE_INIT_FAIL;
 
+	printf("%s succeed.\r\n", __FUNCTION__);
 	return RET_SUCCESS;
 }
 
