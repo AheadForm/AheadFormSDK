@@ -47,13 +47,13 @@ SDK 还提供音量查询、动作控制、状态与故障读取、音频设备�
 
 ## 1. 准备环境
 
-已验证 **Ubuntu 22.04 x86_64 + 本机 GCC**。Ubuntu 24.04 尚未验证；当前不提供 Windows/macOS 原生运行方式，也不需要 ARM64 交叉编译环境。
+AheadFormSDK 支持采用 glibc 的主流 Linux 发行版，可针对 **32 位和 64 位 Linux** 从源码构建。请按发行版和目标架构安装对应的 CycloneDDS、GStreamer 和媒体插件。已在 Ubuntu 22.04 验证 x86_64 原生构建，以及 ARM64 和 ARM32（armhf）交叉构建。Alpine 等采用 musl 的发行版当前需要适配线程调度接口。当前不提供 Windows/macOS 原生运行方式。
 
 电脑与已启动的机器人连接可互通的有线局域网；Linux 虚拟机使用桥接有线网卡。首次安装需联网和 sudo 权限，日常运行使用普通用户。
 
 ## 2. 下载、安装依赖并编译
 
-以下命令在 **Linux 终端**执行，示例将工程放在用户主目录：
+以下命令适用于 **Ubuntu**，示例将工程放在用户主目录：
 
 **机器人 IP `192.168.110.51` 和外部 DDS 域 ID `50` 仅为示例。** 执行部署前，请将 `--robot` 和 `--domain` 换成现场实际值。
 
@@ -69,6 +69,8 @@ bash deploy/deploy_ubuntu.sh --robot 192.168.110.51 --domain 50
 脚本按到机器人的路由选择本地有线网卡；需要显式指定时，追加 `--interface ens33`，将 `ens33` 换成与路由一致的实际网卡名。
 
 脚本会安装构建依赖和媒体插件，检查到机器人的网络，并在缺少指定版本时下载、校验和安装 CycloneDDS 11.0.1。构建要求 GStreamer Core 和 App 均为 1.20 或更高版本。**构建及动态库检查通过后，脚本会备份并覆盖现有配置。** `--skip-packages` 仅跳过 apt 安装。
+
+在其他 Linux 发行版上，使用该发行版的包管理器安装目标架构对应的 GCC、GNU Make、`pkg-config`、GStreamer 开发包及媒体插件，并安装 CycloneDDS 11.0.1。GStreamer Core 和 App 都需达到 1.20。确认 `pkg-config` 能找到依赖后，在仓库根目录运行 `make -C CodeProject`。编译后按下一节填写现场配置。
 
 ## 3. 配置放在哪里、怎样修改
 

@@ -31,6 +31,8 @@ make
 
 推荐已验证的 Ubuntu 22.04，使用虚拟机时将网卡设为桥接模式。[部署脚本](../deploy/deploy_ubuntu.sh)会安装或检查 GCC、Make、`pkg-config`、CycloneDDS 11.0.1、GStreamer Core 和 App 1.20 或更高版本，以及音视频所需的插件。
 
+其他主流 glibc Linux 发行版可按目标架构手动安装依赖，使用同一份源码构建 32 位或 64 位程序。部署方式见 [README](../README.md)。
+
 ### 配置字段说明
 
 SDK 启动时从当前工作目录读取 [`AheadFormSDK_Config.ini`](../CodeProject/AheadFormSDK_Config.ini)。部署脚本会把旧配置备份为同目录的 `AheadFormSDK_Config.ini.bak.*`，再写入新配置。手动修改请在部署完成后进行，保存后重启 SDK 即可生效，无需重新编译。请保留以下三个节及全部字段，节名和字段名区分大小写，每个字段只填写一次。

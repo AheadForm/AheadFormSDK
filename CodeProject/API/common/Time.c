@@ -8,7 +8,7 @@ unsigned long long GetTime100usCnt_UpToNow(void)
     struct timespec ts;
 
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (ts.tv_sec * 10000 + ts.tv_nsec / 100000);
+    return (ts.tv_sec * 10000ULL + ts.tv_nsec / 100000ULL);
 }
 
 unsigned long long GetTimeUsCnt_UpToNow(void)
@@ -16,7 +16,7 @@ unsigned long long GetTimeUsCnt_UpToNow(void)
     struct timespec ts;
 
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (ts.tv_sec * 1000000 + ts.tv_nsec / 1000);
+    return (ts.tv_sec * 1000000ULL + ts.tv_nsec / 1000ULL);
 }
 
 unsigned long long GetElapsedMonotonicTime_ms(unsigned long long StartTime_us)
@@ -158,5 +158,5 @@ int SysTimeCmp(const SYSTIME_RET *pstSysTime1, const SYSTIME_RET *pstSysTime2)
 
 long long CalcTimeDiff_us(struct timespec ts1, struct timespec ts2)
 {
-    return ( (ts2.tv_sec - ts1.tv_sec) * 1000000 + (ts2.tv_nsec - ts1.tv_nsec) / 1000 );
+    return ( ((long long)ts2.tv_sec - ts1.tv_sec) * 1000000 + (ts2.tv_nsec - ts1.tv_nsec) / 1000 );
 }
