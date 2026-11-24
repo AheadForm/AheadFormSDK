@@ -88,7 +88,7 @@ UDP 端口填 `1～65535`，RTP 负载类型编号填 `0～127`；同为 `96` �
 | `OperatingMode [dev/interactive]` | 查询或请求切换机器人工作模式。`dev` 为开发模式，`interactive` 为交互模式。 | `OperatingMode`：查询；`OperatingMode dev`、`OperatingMode interactive`：请求切换。 |
 | `EmotePlayback [csvFileName] [audioFileName] [loop]` | 播放机器人上已有的动作（CSV）或音频（MP3、WAV），至少指定一个资源。可同时指定两种资源，顺序不限；最后加 `loop` 循环播放，循环须包含动作。资源名须带后缀，以机器人上的文件名为准。 | `EmotePlayback intro.csv`：播放动作；`EmotePlayback voice.mp3`：播放音频；`EmotePlayback intro.csv voice.mp3 loop`：循环播放两者。 |
 | `EmotePlayCtrl pause/resume/stop` | 暂停、继续或停止由 `EmotePlayback` 启动的机器人端播放。 | `EmotePlayCtrl pause`、`EmotePlayCtrl resume`、`EmotePlayCtrl stop` |
-| `PlayScript csvFilePath [audioFilePath]` | 播放 Linux 客户端上的文件。动作 CSV 必填，音频可选 MP3 或 PCM WAV；播放期间菜单等待该指令返回。 | 自行准备符合格式要求的文件。在菜单中输入 `PlayScript /home/customer/AheadFormScripts/show.csv`，或输入 `PlayScript /home/customer/AheadFormScripts/show.csv /home/customer/AheadFormScripts/voice.mp3` 加入音频；请将路径换成实际文件的路径。 |
+| `PlayScript csvFilePath [audioFilePath]` | 播放 Linux 客户端上的文件。动作 CSV 必填，音频可选 MP3 或 PCM WAV；播放期间菜单等待该指令返回。 | 从 `CodeProject` 启动后，在菜单中输入 `PlayScript ../scripts/AheadForm_standard_demo_52.csv`，或输入 `PlayScript ../scripts/AheadForm_standard_demo_52.csv ../scripts/AheadForm_standard_demo.mp3` 加入配套音频。 |
 | `Tx1MotionPose t_us pitch_rad yaw_rad roll_rad headX headY headZ leftPitch_rad leftYaw_rad rightPitch_rad rightYaw_rad bs0 … bs51` | 发送一帧完整动作，依次填写微秒时间戳、3 个颈部角度、3 个头部位置分量、4 个眼球角度和 52 个表情权重。 | 见下方完整输入示例。 |
 | `Tx1Face leftPitch_rad leftYaw_rad rightPitch_rad rightYaw_rad bs0 … bs51` | 发送一帧面部动作，依次填写 4 个眼球角度和 52 个表情权重。 | 见下方完整输入示例。 |
 | `Tx1NeckPose pitch_rad yaw_rad roll_rad` | 发送一帧颈部姿态，依次填写俯仰、偏航、侧倾角，单位为弧度。 | `Tx1NeckPose 0.1 0 0`：俯仰目标为 0.1 弧度，其余两轴目标为 0。 |

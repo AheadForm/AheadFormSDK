@@ -42,8 +42,10 @@ SDK 还提供音量查询、动作控制、状态与故障读取、音频设备�
 | [AheadFormSDK 快速上手](doc/AheadFormSDK快速上手.md) | 部署、配置、全部菜单指令和工程移植 |
 | [AheadFormSDK 架构设计说明](doc/AheadFormSDK架构设计说明.md) | 模块职责、DDS 与媒体通路、错误码和构建方式 |
 | [CSV 剧本格式要求](doc/CSV剧本格式要求.md) | 动作 CSV 的字段、单位和文件要求 |
+| [AheadFormSDK 特点说明](doc/AheadFormSDK特点说明.docx) | SDK 特点与使用方式说明（Word） |
+| [SDK 剧本播放方法操作示例](doc/SDK剧本播放方法操作示例.mp4) | 客户端剧本播放的操作演示（视频） |
 
-公开仓库不附带内部测试素材。文档中的 `show.csv` 和 `voice.mp3` 是示例文件名，请自行准备符合格式要求的文件。
+仓库的 [`scripts`](scripts/) 目录提供示例动作 `AheadForm_standard_demo_52.csv` 和配套音频 `AheadForm_standard_demo.mp3`，可按第 5 节直接播放。文档中的 `show.csv` 和 `voice.mp3` 为客户自备文件的示例名称。
 
 ## 1. 准备环境
 
@@ -127,6 +129,13 @@ help
 等到 `>>` 再次出现后，可继续输入指令。菜单中的 `<...>` 是示例，输入时只键入尖括号里的内容。
 
 ## 5. 放置并播放客户剧本
+
+从 `CodeProject` 目录启动 SDK 后，在菜单中输入以下指令播放仓库附带的示例剧本：
+
+```text
+PlayScript ../scripts/AheadForm_standard_demo_52.csv
+PlayScript ../scripts/AheadForm_standard_demo_52.csv ../scripts/AheadForm_standard_demo.mp3
+```
 
 将符合规定格式的动作 CSV 放在 Linux 客户端的可读目录中。需要配音时，再准备一个 MP3 或 PCM WAV。文件不必放在 SDK 目录中。
 
