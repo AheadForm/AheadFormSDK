@@ -53,7 +53,7 @@ SDK 还提供音量查询、动作控制、状态与故障读取、音频设备�
 
 ## 1. 准备环境
 
-AheadFormSDK 面向 GNU/Linux，可针对 **32 位和 64 位 Linux** 从源码构建。C/C++ 已在 Ubuntu 22.04 验证 x86_64 原生构建，以及 ARM64 和 ARM32（armhf）交叉构建。平台支持以现有 GNU/Linux 接口、依赖及工具链的实际能力为准；Python 接入还需要匹配的目标 Python/CFFI 环境，当前未完成 ARM32/ARM64 Python 实机验证。当前不提供 Windows/macOS 原生运行方式。
+AheadFormSDK 面向 GNU/Linux，可针对 **32 位和 64 位 Linux** 从源码构建。C/C++ 已在 Ubuntu 22.04 验证 x86_64 原生构建，以及 ARM64 和 ARM32（armhf）交叉构建。Python 接入已在 Ubuntu 客户端完成机器人实机联调，示例剧本的动作与声音播放均已验证。构建和运行需准备与目标环境匹配的工具链、依赖及 Python/CFFI 环境。当前不提供 Windows/macOS 原生运行方式。
 
 运行 SDK 时，电脑与已启动的机器人连接可互通的有线局域网；Linux 虚拟机使用桥接有线网卡。部署环境时无需连接机器人。已有依赖满足要求时不安装，缺少系统包时才需要联网和 sudo 权限；DDS 和 SDK 使用普通用户构建。
 
