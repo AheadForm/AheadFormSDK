@@ -98,7 +98,7 @@ bash deploy/deploy.sh
 
 ```bash
 cd ~/AheadFormSDK
-nano CodeProject/AheadFormSDK_Config.ini
+vi CodeProject/AheadFormSDK_Config.ini
 ```
 
 | 配置 | 应填写的内容 |
@@ -117,10 +117,9 @@ nano CodeProject/AheadFormSDK_Config.ini
 ```bash
 cd ~/AheadFormSDK/CodeProject
 make
-ldd ./AheadFormSDK
 ```
 
-重新链接成功时输出 `CREATE AheadFormSDK`；`ldd` 不应出现 `not found`。确认机器人已上电至少 10 秒，再启动 SDK：
+重新链接成功时输出 `CREATE AheadFormSDK`。确认机器人已上电至少 10 秒，再启动 SDK：
 
 ```bash
 cd ~/AheadFormSDK/CodeProject
