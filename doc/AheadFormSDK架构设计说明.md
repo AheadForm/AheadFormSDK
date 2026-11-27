@@ -1,5 +1,7 @@
 # AheadFormSDK 架构设计说明
 
+各代码目录和配套文档的入口见[文档与代码清单](文档与代码清单.md)。
+
 本文介绍当前 Linux C SDK 的分层、构建和调用约定，供接入 SDK 或维护源码时查阅。部署、启动和完整指令菜单见[《AheadFormSDK 快速上手》](AheadFormSDK快速上手.md)。
 
 ## 1. API 与 User 的职责
@@ -119,11 +121,42 @@ MIC 和 Video 在首次成功 Start 后注册 Reader，可同时注册独立消�
 
 | 构建入口 | 扫描范围 | 产物 |
 | --- | --- | --- |
-| 从 SDK 根目录运行 `make -C CodeProject`，或在 `CodeProject` 中运行 `make` | `CodeProject` 下全部 `.c`，包含 API、生成的 DDS C 文件和 User | `CodeProject/AheadFormSDK` |
+| 从 SDK 根目录运行 `make -C CodeProject`，或在 `CodeProject` 中运行 `make` | 调用 API 子 Makefile 构建库，并编译 `CodeProject` 下 API 以外的 `.c` 和 `.cpp`，最后链接主程序；两部分可并行构建 | `CodeProject/AheadFormSDK` |
 | 在 `CodeProject/API` 运行 `make -f subMakefile_buildApiLib` | `API` 下全部 `.c` | `CodeProject/API/libAheadFormSDKApi.a` |
+| 从 SDK 根目录运行 `make -C CodeProject/API -f subMakefile_buildApiLib api_so`，或在 `CodeProject/API` 运行 `make -f subMakefile_buildApiLib api_so` | 仅构建 API 动态库，不构建静态库或主程序 | `CodeProject/API/libAheadFormSDKApi.so` |
 
-两个 Makefile 都从当前工作目录递归发现目录和 `.c`，不要求 `src` / `inc`。每个目录通过 `-I` 提供给编译器查找头文件；`-MMD -MP -MF` 将编译时实际用到的头文件写入源码旁的隐藏 `.o.d`，下次 `make` 读取这些依赖决定是否重编。`-I` 负责**找到头文件**，`.o.d` 负责**跟踪变更**。新增源文件或修改头文件不需要维护清单；源码搜索范围内每个 `.c` 都会参与编译。
+两个 Makefile 都从当前工作目录递归发现目录，不要求 `src` / `inc`。主 Makefile 分别用 `c_srcs`、`cpp_srcs` 收集 API 以外的 `.c`、`.cpp`；API 子 Makefile 只收集 `.c`。默认静态构建中，两类源码均在原目录生成普通 `.o`。每个目录通过 `-I` 提供给编译器查找头文件；`-MMD -MP -MF` 将编译时实际用到的头文件写入源码旁的隐藏 `.o.d`，下次 `make` 读取这些依赖决定是否重编。`-I` 负责**找到头文件**，`.o.d` 负责**跟踪变更**。新增源文件或修改头文件不需要维护清单，搜索范围内的相应源码都会参与编译。
 
-在 `User` 内扩展时可创建多级目录，整个程序只保留一个 `main()`。同一入口下普通 `make` 会增量构建；删除或重命名 `.c`、变更编译器或参数后先清理再构建。程序与静态库共用源码旁的 `.o` / `.o.d`，而依赖路径的基准不同，切换入口时先用目标入口的 `clean` 清理：切到主程序用 `make -C CodeProject clean`，切到静态库在 `API` 中运行 `make -f subMakefile_buildApiLib clean`。
+客户可在 `CodeProject` 下除 `API` 以外的任意目录扩展业务代码，不局限于 `User`；例如新建 `CodeProject/Customer`，其 `.c`、`.cpp` 和头文件也会自动纳入构建，无需修改 Makefile。各业务目录可创建多级子目录，同一目录可混合放置 `.c` 和 `.cpp`，但不得同时存在 `foo.c` 和 `foo.cpp`；不同目录可以使用相同文件名。`API` 仍为纯 C 功能库，不收集 `.cpp`。整个程序只保留一个 `main()`。`.c` 由 `CC` 配合 `CPPFLAGS`、`CFLAGS` 编译，`.cpp` 由 `CXX` 配合 `CPPFLAGS`、`CXXFLAGS` 编译；存在 `.cpp` 时由 `CXX` 完成最终链接，否则使用 `CC`。C++ 调用 SDK 的 C 接口及自有 C 模块时，需要正确的 C 链接声明，示例见[快速上手的移植方法](AheadFormSDK快速上手.md#5-移植方法)。
 
-静态库只归档 API 对象。客户工程将 API 头文件目录加入搜索路径，把库放在调用方对象文件之后，再链接 CycloneDDS、GStreamer App、`pthread`、`m`、`rt`。主构建检查 GStreamer Core 和 App 开发包的最低版本为 1.20；静态库入口还检查 CycloneDDS 包是否存在。Ubuntu [部署脚本](../deploy/deploy_ubuntu.sh) 使用 CycloneDDS 11.0.1，检查媒体插件后全量构建和检查动态库，再备份并更新配置。
+主 Makefile 的头文件搜索仍包含 API；API 源码始终由 API 子 Makefile 编译，两个入口使用相同的 API 对象及头文件依赖路径，相同工具链和参数下切换入口无须清理。每次主构建会进入 API 检查增量更新；API 库变化后，本次构建即重新链接主程序，无变化则不重新编译、归档或链接。删除、重命名源码或将源码在 `.c`、`.cpp` 之间转换后先清理再构建；变更编译器或参数时重新部署，再手动 clean 后构建；Makefile 不自动检测编译参数变化。主入口的 `clean` 同时调用 API 清理，保留私有 DDS 缓存。
+
+静态库只归档 API 对象，不把 DDS 再打包进 API 库。API 构建入口的 `print-cflags`、`print-libs` 分别输出客户工程所需的编译参数和完整链接参数：调用方对象文件之后依次链接 API 库、私有 `libddsc.a`、GStreamer 和系统库。头文件与链接参数通过项目配置查询，不依赖系统的 CycloneDDS 安装。
+
+默认构建不生成 API 动态库。`api_so` 为按需入口，API 子 Makefile 使用独立的 `.pic.o` 并添加 `-fPIC`，不改变普通对象的编译参数。两类对象分别记录头文件依赖，可以共存且切换入口无须清理。API 动态库静态链接私有 DDS，动态依赖目标环境的 GStreamer 和系统库；`clean` 同时删除两类对象及 API 的 `.a`、`.so`，保留 DDS 缓存。
+
+### 6.1 部署与日常构建分工
+
+根目录 [`ThirdParty/cyclonedds-11.0.1`](../ThirdParty/cyclonedds-11.0.1/) 是完整、已解压的 DDS 上游源码，位于 `CodeProject` 外，不参与 SDK 的递归源码扫描。[`deploy/deploy.sh`](../deploy/deploy.sh) 调用上游 CMake 构建静态 DDS，关闭 IDLC、测试、示例、性能工具、安全/TLS、iceoryx 和 LTO。没有下载源码、安装系统 DDS 或运行系统 `ldconfig` 的步骤。
+
+部署与机器人连接配置分开：默认直接运行 `bash deploy/deploy.sh`，无需机器人在线，也不要求 IP、DDS 域或网卡参数。部署末尾提示 `CodeProject/AheadFormSDK_Config.ini` 的完整路径，运行前由客户按目标机器人填写。`--robot`、`--domain`、`--interface` 均为可选的配置辅助参数，默认保留原 INI；只有指定 IP 才检查连通性。更换机器人只需修改运行配置并重启 SDK，不需要重建 DDS 或重新部署。
+
+私有产物位于 `.deps/<工具链标识>/`，包括 CMake 中间文件、安装目录、日志和成功标记。标识包含编译器身份、目标、sysroot、用户参数、源码清单和构建选项；部署先校验源码，成功产物可复用，`--rebuild-dds` 强制重建当前配置。失败的构建没有可用标记。部署成功后，`.deps/active.mk` 记录所选配置，两个原有 Makefile 通过 [`deploy/deps.mk`](../deploy/deps.mk) 读取。同一套工具链和依赖环境只需成功部署一次，部署只准备依赖并保存工具链 `.mk` 配置，不构建 SDK；首次使用时也需手动 make；日常修改或新增源码、头文件后，在 SDK 根目录执行 `make -C CodeProject` 即可，不必再次输入编译器或重新部署。普通 `make` 只检查配置并增量编译 SDK，不调用 CMake，不重新构建 DDS。`make clean` 不需要依赖已部署，也不删除 DDS 缓存。删除/重命名源码、切换源码后缀等操作的构建命令见[修改 SDK 后的编译](AheadFormSDK快速上手.md#修改-sdk-后的编译)。
+
+终端部署只需确认 C 编译器，每项询问等待 2 分钟，回车或超时保留当前值；配套 C++ 编译器及静态库工具自动确定，无法推导时才补问。本机编译且无特殊要求时直接回车；需指定时填写 `gcc`、`clang` 或客户 C 编译器的可执行文件路径，交叉编译另需目标依赖配置。默认读取 `deploy/deps.mk` 明确填写的覆盖项和环境变量，再使用上次成功设置，首次使用系统 `cc`；文件覆盖项遵循 Make 优先级。非交互环境或 `--non-interactive` 跳过提问。部署也接受 `CC/CXX/AR/RANLIB/CROSS_COMPILE/SYSROOT`、编译链接参数及 `PKG_CONFIG*`。相同参数传给 DDS 和 SDK；更换工具链、目标架构、sysroot、编译/链接参数或 GStreamer 开发环境后须重新部署，依赖配置或 DDS 缓存丢失/失效时也应重新部署。部署不清理 SDK 产物；切换工具链或参数后，由客户手动 clean 再构建所需入口。直接 `make` 时覆盖了不匹配的参数会报错，不能静默回退到系统 DDS。DDS 头文件参数通过限定到私有目录的 `pkg-config` 获取，链接显式使用该目录的 `libddsc.a`。GStreamer 的查询继续使用客户环境；交叉编译必须提供目标 GStreamer，不能使用主机库。输入示例见[指定编译器](依赖部署与交叉编译.md#4-指定编译器)。
+
+部署使用项目级锁防止并发构建依赖或写入配置；上次成功设置保存在 `.deps/deploy-settings.json`，中断后可重新执行。DDS 仅在安装与校验完成后发布成功标记；INI 内容不变时不重复备份或写入。
+
+部署脚本只在必要的系统包操作中提权。APT、DNF、Zypper 系统可安装或升级缺少的构建工具及 GStreamer 1.x；不增加软件源、不做整机升级、不移除冲突包。Arch 等其他系统仅检查并报告缺项。GStreamer 仍是客户系统依赖，因此不承诺 SDK 全部依赖离线，也不承诺所有系统和 ABI 无条件可运行。完整选项、交叉编译和私有目录说明见[依赖部署与交叉编译](依赖部署与交叉编译.md)。
+
+## 7. Python 接入与业务复用
+
+根目录 `python_demo` 使用 CFFI 编译模式：`bindings.py` 集中声明需要暴露的类型与函数，生成 `_aheadform_api` 和可选 `_aheadform_user` 扩展，不再维护手写 C 适配函数。结构体只声明需访问字段，其余通过 `...;` 交给原头文件与编译器确定布局。新增公开 C API 通常只补声明和必要类型，重新构建后通过 `sdk.bind("函数名")` 调用，无需增加 C 转发函数或 Python 便捷方法。
+
+Python Makefile 直接调用 API 子 Makefile 的 `api_so`，复用标准 `libAheadFormSDKApi.so`。CFFI 仅生成 C，由 Make 使用部署保存的编译器、sysroot 和参数编译；不复制解释器的默认优化参数，不修改总 Makefile。普通 C/C++ make 默认静态 API 库，不构建 CFFI。默认部署仅尝试准备 `python_demo/.venv` 和 CFFI，不构建扩展或展示菜单；之后在 `python_demo` 手动 make。Python 环境或 CFFI 安装失败不阻止 C/C++ 依赖部署；部署完成先显示“部署结果”，分行列出两种环境状态及失败原因，再显示“后续操作指南”；主动中断仍取消部署。部署保留已有扩展和缓存；`--skip-python` 可跳过 Python 环境准备，不向系统 Python 安装包。
+
+API/User 扩展通过 CFFI `include()` 共享类型，均使用同一份标准 API 动态库，不另静态加入 DDS。User 递归收集 `.c`/`.cpp`，排除原主入口与输入循环，直接读取 `gUserInTaskAry` 并调用处理函数；新增注册指令通常无需 Python 分支。在 `python_demo` 中不带指令运行 `python demo_user.py`，先初始化 SDK，成功后才显示输入说明和 `>>`，顺序与 C 入口一致；初始化失败直接报错退出，不进入输入循环。后续指令复用同一对象，正常退出、EOF 或 Ctrl+C 时释放已初始化对象。独立使用 `--help`、`--list` 或单次 `help`/`exit` 不初始化机器人；保留单次业务命令用法。这里的输入循环由 Python 提供，不调用原 C 的 `main()` 或终端输入循环。`python_demo` 的 `make clean` 同时调用 API 子 Makefile 清理标准 API 库及对象，再删除 Python 产物，保留私有 DDS 缓存和 Python 环境。原有打印、阻塞及部分错误路径的进程退出行为保留，结构化数据优先使用 API。
+
+同一进程只管理一个活动 SDK 对象，常用方法、绑定及 User 调用串行执行。Python 模块强引用活动控制对象；成功释放后才允许回收。初始化/释放失败或被中断时保留内存并禁止重试，不依赖 GC 自动释放。
+
+产物按 DDS 工具链和 Python ABI 隔离。Python 使用私有 venv 安装固定版本 CFFI，部署检查通过时复用已有包；可通过 `--python-wheelhouse` 从本地包目录安装。交叉构建必须显式提供可在宿主运行的目标 `PYTHON_CONFIG`、目标头文件及链接参数，不静默使用宿主 Python 配置。一次性准备、日常构建、API/User 示例和实际验证边界见 [Python 接入说明](../python_demo/doc/Python接入说明.md)。

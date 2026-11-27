@@ -1,0 +1,10 @@
+{
+  "name": "CycloneDDS",
+  "version": "11.0.1",
+  "directory": "cyclonedds-11.0.1",
+  "source": "https://codeload.github.com/eclipse-cyclonedds/cyclonedds/tar.gz/refs/tags/11.0.1",
+  "archive_sha256": "c25d46075ad6b5cee564bda9e5f49509e9a6dbb1a8b858e708eb360d335cf973",
+  "license": "EPL-2.0 OR BSD-3-Clause",
+  "patches": [],
+  "checksums_sha256": "6aed000e3e37d1c869f43097fd1e723081a6f00d5542e2bd0483f654abbdc83d"
+}

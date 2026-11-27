@@ -3,3 +3,12 @@
 *.sh text eol=lf
 /CodeProject/Makefile text eol=lf
 /CodeProject/API/subMakefile_buildApiLib text eol=lf
+# Preserve upstream source bytes and checksum input.
+# Upstream RST heading underlines are not merge conflict markers.
+/ThirdParty/cyclonedds-11.0.1/** -text -whitespace conflict-marker-size=999
+/ThirdParty/SHA256SUMS text eol=lf
+/deploy/*.sh text eol=lf
+/deploy/*.py text eol=lf
+/deploy/*.mk text eol=lf
+/python_demo/Makefile text eol=lf
+/python_demo/**/*.py text eol=lf

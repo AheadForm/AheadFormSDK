@@ -1,38 +1,50 @@
-CC := gcc
-AR := ar
+SDK_ROOT := $(abspath ../..)
+include $(SDK_ROOT)/deploy/deps.mk
 api_lib := libAheadFormSDKApi.a
+api_shared_lib := libAheadFormSDKApi.so
 .DEFAULT_GOAL := $(api_lib)
 
 dirs := $(shell find . -type d)
 srcs := $(foreach dir,$(dirs),$(wildcard $(dir)/*.c))
 objs := $(patsubst %.c,%.o,$(srcs))
+pic_objs := $(patsubst %.c,%.pic.o,$(srcs))
 incFlags := $(foreach dir,$(dirs),-I$(dir))
 
-PKG_CONFIG ?= pkg-config
+override CPPFLAGS += -D_GNU_SOURCE $(incFlags) $(dds_cflags) $(gstreamer_cflags)
+override CFLAGS += -Wall -Werror -pthread
 
-ifneq ($(MAKECMDGOALS),clean)
-ifeq ($(shell $(PKG_CONFIG) --exists CycloneDDS 'gstreamer-1.0 >= 1.20' 'gstreamer-app-1.0 >= 1.20' && printf 'yes'),)
-$(error Build requires pkg-config, CycloneDDS and GStreamer Core/App >= 1.20)
-endif
-endif
-
-CPPFLAGS := -D_GNU_SOURCE $(incFlags) $(shell $(PKG_CONFIG) --cflags CycloneDDS gstreamer-app-1.0 2>/dev/null)
-CFLAGS := -Wall -Werror -pthread
-
-dep_files := $(foreach f,$(objs),$(dir $(f)).$(notdir $(f)).d)
+dep_files := $(foreach f,$(objs) $(pic_objs),$(dir $(f)).$(notdir $(f)).d)
 -include $(dep_files)
 
-$(api_lib): $(objs)
+$(api_lib): $(objs) | check-deps
 	rm -f $@
 	$(AR) rcs $@ $^
 	@echo "CREATE $@"
 
+api_so: $(api_shared_lib)
+
+$(api_shared_lib): $(pic_objs) | check-deps
+	$(CC) $(sysroot_flags) -shared -Wl,-z,defs -Wl,-soname,$(notdir $@) $^ -o $@ $(LDFLAGS) $(dds_libs) $(gstreamer_libs) -pthread -lm -lrt -ldl $(LDLIBS)
+	@echo "CREATE $(abspath $@)"
+
+$(objs) $(pic_objs): | check-deps
+
 %.o: %.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -MF $(dir $@).$(notdir $@).d -MT $@ -c -o $@ $<
+	$(CC) $(sysroot_flags) $(CPPFLAGS) $(CFLAGS) -MMD -MP -MF $(dir $@).$(notdir $@).d -MT $@ -c -o $@ $<
+
+%.pic.o: %.c
+	$(CC) $(sysroot_flags) $(CPPFLAGS) $(CFLAGS) -fPIC -MMD -MP -MF $(dir $@).$(notdir $@).d -MT $@ -c -o $@ $<
 
 clean:
 	find . -type f \( -name '*.o' -o -name '*.o.d' \) -delete
-	rm -f $(api_lib)
+	rm -f $(api_lib) $(api_shared_lib)
 
 .DELETE_ON_ERROR:
-.PHONY: clean
+.PHONY: api_so clean
+
+.PHONY: print-cflags print-libs
+print-cflags: | check-deps
+	@printf '%s\n' "$(sysroot_flags) $(AHEADFORM_CPPFLAGS) $(AHEADFORM_CFLAGS) -D_GNU_SOURCE -pthread $(foreach dir,$(dirs),-I$(abspath $(dir))) $(dds_cflags) $(gstreamer_cflags)"
+
+print-libs: | check-deps
+	@printf '%s\n' "$(sysroot_flags) $(AHEADFORM_LDFLAGS) $(abspath $(api_lib)) $(dds_libs) $(gstreamer_libs) -pthread -lm -lrt -ldl $(AHEADFORM_LDLIBS)"

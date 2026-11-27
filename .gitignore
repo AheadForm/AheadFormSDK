@@ -3,6 +3,16 @@
 *.d
 /CodeProject/AheadFormSDK
 /CodeProject/API/libAheadFormSDKApi.a
+/CodeProject/API/libAheadFormSDKApi.so
 
 /scripts/intro+clzy.csv
 /scripts/intro+clzy.mp3
+
+# Private dependency cache and Python bytecode
+/.deps/
+__pycache__/
+*.pyc
+/CodeProject/AheadFormSDK_Config.ini.bak.*
+/CodeProject/AheadFormSDK_Config.ini.tmp
+/python_demo/.build/
+/python_demo/.venv/
